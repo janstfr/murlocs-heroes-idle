@@ -3,7 +3,7 @@ Mrgl.UI = Mrgl.UI or {}
 do
   local buyKey
   local quietIn
-  local K, C, Core, W, M, S, calm, visible, rush, laneColor, buildNumber, placeNumber, stopNumber, killNumber, number, laneLive, updateNumbers, fadeAllNumbers, fitText, utf8Head, beginHeadline, setReward, showHeadline, endHeadline, updateHeadline, clearHeadline, buildSpark, buildCoin, buildWhelp, ringFx, flashFx, flash, canPunch, punch, burst, coinFlight, coinsFlying, updateCoins, whelpFlight, chainReset, popPortrait, milestoneFx, silhouette, bossGlow, newAbility, bossRingColor, setNumberColor
+  local K, C, Core, W, M, S, calm, visible, rush, laneColor, buildNumber, placeNumber, stopNumber, killNumber, number, laneLive, updateNumbers, fadeAllNumbers, fitText, utf8Head, beginHeadline, setReward, showHeadline, endHeadline, updateHeadline, clearHeadline, buildSpark, buildCoin, buildWhelp, ringFx, flashFx, flash, canPunch, burst, coinFlight, coinsFlying, updateCoins, whelpFlight, chainReset, popPortrait, milestoneFx, silhouette, bossGlow, newAbility, bossRingColor, setNumberColor
   local J = {}
   Mrgl.UI.Juice = J
   local U = Mrgl.U
@@ -318,7 +318,7 @@ do
   local hq = {  }; local hcur
   local hf; local hfs; local hIn; local hOut; local hreward
   local ff = { times = {}, lives = {}, born = -1, on = false, swap = false, WIN = 5, RATE = 0.6, N = 5, LIFE_ON = 1.5, LIFE_OFF = 2.5,
-    BOSS_T = 3, bossT = -100, GAP = 8, last = -100, punchT = -100, PUNCH_GAP = 0.6,
+    BOSS_T = 3, bossT = -100, GAP = 8, last = -100,
     kinds = { victory = true, bonus = true, rare = true, zone = true } }
   ff.check = function()
     local now = GetTime()
@@ -364,13 +364,6 @@ do
   end
   ff.spawn = function()
     ff.born = GetTime()
-  end
-  ff.punchOk = function()
-    if ff.check() or GetTime() - ff.punchT < ff.PUNCH_GAP or not canPunch() or Mrgl.db.enemyHp <= 0 then
-      return false
-    end
-    ff.punchT = GetTime()
-    return true
   end
   ff.quiet = function()
     return ff.check() and (GetTime() - ff.last < ff.GAP or hcur ~= nil or U.Len(hq) > 0)
@@ -779,7 +772,7 @@ do
     local st = M().st
     st.nameTarget = 1
     st.nameA = 1
-    W().name:SetAlpha(1)
+    M().ApplyNameAlpha(true)
     st.bossHide = false
     if st.zoneDefer then
       st.zoneDefer = false
@@ -1663,21 +1656,6 @@ do
     return not M().st.enemyLocked and not J.die:IsPlaying() and not J.spawn:IsPlaying() and Core().rt.respawn <= 0
   end
   J.CanPunch = canPunch
-  function punch()
-    K().Replay(J.punch)
-    W().enemyBack:Show()
-  end
-  J.Punch = function()
-    if not visible() or not ff.punchOk() then
-      return
-    end
-    if not calm() then
-      K().ScaleTo(J.punchScale1, 0.97, 0.97)
-      K().ScaleFrom(J.punchScale2, 0.97, 0.97)
-      punch()
-    end
-    flash(0.10)
-  end
   J.ManualClick = function()
     if not visible() then
       return
@@ -1937,15 +1915,6 @@ do
           skipHits = skipHits - 1
         end
         number("R", p.amount, p.kind == "click", true)
-        if not visible() or not ff.punchOk() then
-          return
-        end
-        flash(0.15)
-        if not calm() then
-          K().ScaleTo(J.punchScale1, 0.95, 0.95)
-          K().ScaleFrom(J.punchScale2, 0.95, 0.95)
-          punch()
-        end
         return
       end
       if p.kind == "click" and skipHits > 0 then
@@ -2454,7 +2423,7 @@ do
     M().GoldPlusStop()
     W().enemy:SetAlpha(1)
     M().st.dimA = 1
-    W().enemyIcon:SetAlpha(1)
+    M().ApplyDim(true)
     M().LockEnemy(false)
     bossPause = bossPause and Core().rt.respawn > 0
     shownQueued = 0

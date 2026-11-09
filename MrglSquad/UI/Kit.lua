@@ -221,6 +221,7 @@ do
   K.MurlocHead = function(frame, i, size, layer)
     return K.HeadOf(frame, Mrgl.Core.Formula.Murloc(i), size, layer)
   end
+  K.NATURAL_ADD = 0.45
   K.HeadOf = function(frame, m, size, layer)
     local L = layer
     if L == nil then
@@ -233,7 +234,7 @@ do
     h.add:SetBlendMode("ADD")
     local t = m.tint
     if m.natural == true then
-      h.add:Hide()
+      h.add:SetVertexColor(K.NATURAL_ADD, K.NATURAL_ADD, K.NATURAL_ADD, 1)
     else
       h.base:SetDesaturated(true)
       h.base:SetVertexColor(t[1], t[2], t[3], 1)
@@ -264,9 +265,7 @@ do
       end
       h.shown = on
       h.base:SetShown(on)
-      if m.natural ~= true then
-        h.add:SetShown(on and h.state == "full")
-      end
+      h.add:SetShown(on and h.state == "full")
       if h.badge ~= nil then
         h.badge:SetShown(on)
         h.badgeBg:SetShown(on)
@@ -281,9 +280,7 @@ do
       end
       local was = h.state
       h.state = st
-      if m.natural ~= true then
-        h.add:SetShown(st == "full" and h.shown)
-      end
+      h.add:SetShown(st == "full" and h.shown)
       if m.natural == true then
         h.base:SetDesaturated(st ~= "full")
       end
