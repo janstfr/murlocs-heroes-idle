@@ -1,5 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/Shop.lua equivalent: hire (x1/Next/Max), upgrades, self lines, Best Buy (plan 4.2, 4.3, 5.2).
 Mrgl.Core = Mrgl.Core or {}
 do
   local F, B, applyCand, evalCand, rankPull, waitFor, itemName, calcChain
@@ -16,14 +15,12 @@ do
   Sh.MODE_X1 = 1
   Sh.MODE_NEXT = 2
   Sh.MODE_MAX = 3
-  -- ------------------------------------------------------------ murlocs
   Sh.Count = function()
     return U.Len(Mrgl.Data.Murlocs)
   end
   Sh.Hired = function(i)
     return Mrgl.db.murlocs[F().Murloc(i).id].n
   end
-  -- The next murloc not yet hired (0 when all are hired)
   Sh.NextRank = function()
     for i = 1, Sh.Count() do
       if Sh.Hired(i) <= 0 then
@@ -45,7 +42,6 @@ do
   Sh.Price = function(i, k)
     return F().Bundle(i, Sh.Hired(i), k)
   end
-  -- New Tide C4: purchases of Shop.BuyBest(true) (Quartermaster) carry auto = true (the UI buys them silently)
   local function tag(p)
     if C.rt.autoBuy == true then
       p.auto = true
@@ -55,7 +51,7 @@ do
   Sh.Hire = function(id, k)
     local db = Mrgl.db
     local i = F().MurlocIndex(id)
-    if i <= 0 or type(k) ~= "number" or not (k >= 1) then   -- JS: !(undefined >= 1)
+    if i <= 0 or type(k) ~= "number" or not (k >= 1) then
       return false
     end
     local cost = Sh.Price(i, k)
@@ -74,7 +70,6 @@ do
     end
     return true
   end
-  -- ------------------------------------------------------------ upgrades
   Sh.UpgradeUnlocked = function(i)
     local e = Mrgl.db.murlocs[F().Murloc(i).id]
     return e.u < 3 and e.n >= F().UpgradeReq(e.u + 1)
@@ -96,7 +91,6 @@ do
     C.Fire("UPGRADE", tag({ id = id, tier = e.u, slot = i }))
     return true
   end
-  -- ------------------------------------------------------------ self
   Sh.SelfVisible = function(id)
     local db = Mrgl.db
     if id == "click" or id == "echo" then
@@ -120,7 +114,6 @@ do
     C.Fire("SELF_UP", tag({ id = id, rank = r + 1 }))
     return true
   end
-  -- Display value of a self line at rank r
   Sh.SelfValue = function(id, r)
     local b = B()
     if id == "click" then
@@ -134,11 +127,9 @@ do
     end
     return b.CRITM_BASE + b.CRITM_STEP * r
   end
-  -- ------------------------------------------------------------ Best Buy (plan 5.2)
   Sh.ClickFactor = function()
     return math.min(B().BESTBUY_CLICK_CAP, B().BESTBUY_CLICK_SHARE * Mrgl.Core.Combat.ClickRate())
   end
-  -- murloc and self tables after a candidate purchase (copies only where they change)
   function applyCand(cand)
     local db = Mrgl.db
     local M = db.murlocs
@@ -155,15 +146,10 @@ do
     end
     return { M = M, S = S }
   end
-  -- effective DPS after a candidate purchase
   function evalCand(cand, c)
     local a = applyCand(cand)
     return F().EffDPS(a.M, a.S, c)
   end
-  -- r4 E15: the purchase with the biggest jump in boss readiness (F.Strength, share of a sure win).
-  -- Candidates: all of Sh.Candidates() (bundles up to the next milestone included) that are affordable
-  -- within NEXTJUMP_SEC of income. Returns undefined below NEXTJUMP_MIN (points of strength).
-  -- Result: {kind, id, slot, tier, amount, to, name, pct}
   Sh.NextJump = function()
     local db = Mrgl.db
     local Bo = Mrgl.Core.Boss
@@ -234,10 +220,6 @@ do
     end
     return F().GoldRate(db.murlocs, db.self, Mrgl.Core.Combat.FarmStage(), cps)
   end
-  -- Returns the target: {kind, id, slot, amount, cost, tier, gain (%), affordable, wait (sec), isNew}
-  -- r2 E2: candidates below BESTBUY_MIN_GAIN % are dropped (undefined = nothing worth buying)
-  -- r2 E3: the next murloc rank is the target as soon as it is within NEWRANK_SEC of income
-  -- r2 E4: an unaffordable best target that is at most BESTBUY_SAVE_SEC away is saved for
   Sh.BestBuy = function()
     local db = Mrgl.db
     local b = B()
@@ -280,7 +262,6 @@ do
       end
     end
     local target
-    -- tide1c C5: the "New!" saving rule is run-1 onboarding only; after the first New Tide every rank is known
     if newRank ~= nil and nextR > 1 and Mrgl.Core.Tide.Total() == 0 and newRank.cost <= db.gold + b.NEWRANK_SEC * Sh.GoldRate() then
       target = newRank
       target.isNew = true
@@ -293,8 +274,6 @@ do
       if not saveFor and bestAff ~= nil and bestAff.score >= b.BESTBUY_MIN_SHARE * best.score then
         target = bestAff
       end
-      -- A milestone bundle costs exactly the sum of its singles: while saving for one, buy the
-      -- next single of that murloc (same efficiency, always one action). implementer-log #BB1
       if target.kind == "hire" and target.amount > 1 and target.cost > db.gold then
         for j = 1, U.Len(cands) do
           local one = U.At(cands, j)
@@ -305,8 +284,6 @@ do
         end
       end
       target.isNew = false
-      -- r3 E10 rank pull: a murloc with 1-9 owned gets its bundle to 10 when that is at least 1/RANKPULL as good;
-      -- affordable bundle -> bundle, else an affordable single of it, else the target stays (never save for it)
       local pulled = rankPull(cands, target)
       if pulled ~= nil then
         target = pulled
@@ -349,7 +326,7 @@ do
           if single ~= nil and single.after ~= nil and single.cost <= db.gold then
             return single
           end
-          return nil -- first hit counts; never save for the pull
+          return nil
         end
       end
     end
@@ -372,9 +349,6 @@ do
     end
     return U.At(Mrgl.Data.Self, t.slot).name
   end
-  -- r2 E1: the whole chain one click buys. Simulated on a copy of the db without events.
-  -- Returns undefined (nothing worth buying) or
-  -- {first, n, cost, gain (%), items = [{name, kind, slot, count, cost}], affordable, wait, isNew}
   function calcChain()
     local real = Mrgl.db
     local rt = C.rt
@@ -423,7 +397,6 @@ do
     end
     return ch
   end
-  -- r2 W8: cached, recalculated only when something relevant changed
   local cache = { valid = false, gold = 0, cps = 0, stage = 0, chain = nil }
   Sh.Dirty = function()
     cache.valid = false
@@ -434,7 +407,6 @@ do
     local cps = Mrgl.Core.Combat.ClickRate()
     local ch = cache.chain
     local stale = not cache.valid or db.stage ~= cache.stage or math.abs(cps - cache.cps) >= 0.5 or math.abs(db.gold - cache.gold) > 0.01 * math.max(1, cache.gold)
-    -- crossing a price must show at once
     if not stale and ch ~= nil then
       if not ch.affordable and db.gold >= ch.first.cost then
         stale = true
@@ -465,8 +437,6 @@ do
     end
     return Sh.BuySelf(t.id)
   end
-  -- One click (or B) buys the whole chain (r2 E1). Returns true when anything was bought.
-  -- auto = true: the Quartermaster (New Tide C4) buys; every event of the chain carries auto = true
   Sh.BuyBest = function(auto)
     local ch = Sh.Chain()
     if ch == nil or not ch.affordable or ch.n <= 0 then

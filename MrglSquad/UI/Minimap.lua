@@ -1,17 +1,10 @@
 local ADDON, Mrgl = ...
--- j1 #12 (Jan): minimap button, addon only (the browser has no minimap; the shared settings toggle calls
--- Mrgl.UI.Minimap.Apply when it exists). Own code, no LibDBIcon, as in BeautifulAttune/UI/MinimapButton.lua and
--- AzerothIdle/UI.lua. EllesmereUIMinimap (EUI_Minimap_Buttons.lua:310-330) collects children of Minimap that are a
--- Button with a name not ending in a digit and at least 20 px wide: "MrglSquadMinimapButton", 31x31.
--- Settings: db.settings.minimap (shown, default true), db.settings.minimapAngle (degrees, saved in MrglSquadDB).
 Mrgl.UI = Mrgl.UI or {}
-
 do
   local MB = {}
   Mrgl.UI.Minimap = MB
   local ICON = "Interface\\Icons\\INV_Misc_Head_Murloc_01"
   local button
-
   local function settings()
     return Mrgl.db.settings
   end
@@ -22,14 +15,9 @@ do
     end
     return a
   end
-
-  -- j1b W3: a collector (EllesmereUIMinimap flyout) reparents the button and lays it out itself; from then on we never
-  -- set its points or drag it
   local function ours()
     return button ~= nil and button:GetParent() == Minimap
   end
-
-  -- round minimap: on the circle; square minimaps (skins define GetMinimapShape) on the square's edge
   local function place()
     if not ours() then
       return
@@ -54,10 +42,6 @@ do
     button:ClearAllPoints()
     button:SetPoint("CENTER", Minimap, "CENTER", x, y)
   end
-
-  -- while dragged with the left button: the angle follows the cursor around the minimap centre.
-  -- GetCursorPosition is in physical pixels: divided by the minimap's effective scale (its own units, like GetCenter).
-  -- j1 #13: a missed OnDragStop (button released outside the client) ends the drag here.
   local function dragUpdate(self)
     if not IsMouseButtonDown("LeftButton") or not ours() then
       self:SetScript("OnUpdate", nil)
@@ -76,8 +60,6 @@ do
     settings().minimapAngle = math.fmod(deg + 360, 360)
     place()
   end
-
-  -- tooltip lines (also rebuilt by Kit.RefreshTip while hovered: live stage and gold)
   local function tip(tt)
     local S = Mrgl.Data.Strings
     local U = Mrgl.U
@@ -89,12 +71,10 @@ do
     end
     tt:AddLine(S.MINIMAP_CLICK, 0.7, 0.7, 0.7)
   end
-
   local function ready()
     local UI = Mrgl.UI
     return Mrgl.db ~= nil and UI.IsReady ~= nil and UI.IsReady()
   end
-
   local function onClick(self, mouse)
     if not ready() then
       return
@@ -103,7 +83,6 @@ do
     UI.Kit.HideOwnTip()
     local f = UI.Main.w.frame
     if mouse == "RightButton" then
-      -- j1 M: right-click minimizes (a closed window opens minimized)
       if UI.Main.SetMinimized == nil then
         return
       end
@@ -114,7 +93,6 @@ do
         UI.Main.SetMinimized(not UI.Main.IsMinimized())
       end
     elseif IsShiftKeyDown() then
-      -- shift-left: the settings page (window open and restored first); tide1b T6: an open New Tide popup closes first
       if UI.Popup.TideIsOpen ~= nil and UI.Popup.TideIsOpen() then
         UI.Popup.TideCancel()
       end
@@ -131,7 +109,6 @@ do
       UI.Toggle()
     end
   end
-
   local function create()
     button = CreateFrame("Button", "MrglSquadMinimapButton", Minimap)
     button:SetSize(31, 31)
@@ -147,19 +124,18 @@ do
     icon:SetSize(20, 20)
     icon:SetPoint("CENTER", button, "CENTER", 0, 0)
     icon:SetTexture(ICON)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- icon border cropped
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     button.icon = icon
     local border = button:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    -- hover highlight as an own HIGHLIGHT texture (port-plan 2.4: no SetHighlightTexture)
     local hl = button:CreateTexture(nil, "HIGHLIGHT")
     hl:SetSize(31, 31)
     hl:SetPoint("CENTER", button, "CENTER", 0, 0)
     hl:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
     hl:SetBlendMode("ADD")
-    button.mrglTipKeepAnchor = true -- j1b W1: Kit.RefreshTip must not move this tooltip next to the window
+    button.mrglTipKeepAnchor = true
     button.mrglTip = function(tt)
       tip(tt)
     end
@@ -177,7 +153,7 @@ do
     button:SetScript("OnEnter", function(self)
       if Mrgl.UI.Kit.NoTips() then
         return
-      end -- j2b WoW S1: no tooltip of ours in combat
+      end
       GameTooltip:SetOwner(self, "ANCHOR_LEFT")
       tip(GameTooltip)
       GameTooltip:Show()
@@ -186,8 +162,6 @@ do
       Mrgl.UI.Kit.HideOwnTip()
     end)
   end
-
-  -- show or hide after login and after the setting changed
   MB.Apply = function()
     if Mrgl.db == nil or Minimap == nil then
       return
@@ -204,8 +178,6 @@ do
     place()
     button:Show()
   end
-
-  -- /mrgl minimap and the settings toggle
   MB.Toggle = function(quiet)
     local s = settings()
     s.minimap = s.minimap == false
@@ -219,7 +191,6 @@ do
       end
     end
   end
-
   MB.Frame = function()
     return button
   end

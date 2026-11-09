@@ -1,6 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/Formula.lua equivalent (plan 5.1). Pure functions over db tables.
--- M = db.murlocs (id -> {n, u}), S = db.self (id -> rank).
 Mrgl.Core = Mrgl.Core or {}
 do
   local B, Ti, Pw
@@ -10,19 +8,17 @@ do
   function B()
     return Mrgl.Data.Balance
   end
-  -- New Tide C2: Core/Tide reads Mrgl.db; without a db every factor is 1, plus values 0, offline rate OFFLINE_RATE
   function Ti()
     return Mrgl.Core.Tide
   end
   function Pw(key)
     return Mrgl.Core.Abilities.Power(key)
   end
-  -- ------------------------------------------------------------ stages
   F.IsBoss = function(s)
-    return s % B().BOSS_EVERY == 0   -- nonneg (stage >= 1)
+    return s % B().BOSS_EVERY == 0
   end
   F.IsZoneBoss = function(s)
-    return s % B().STAGES_PER_ZONE == 0   -- nonneg (stage >= 1)
+    return s % B().STAGES_PER_ZONE == 0
   end
   F.HP = function(s)
     return B().HP_BASE * B().HP_GROWTH ^ (s - 1) + B().HP_LIN * (s - 1)
@@ -31,12 +27,12 @@ do
     if F.IsZoneBoss(s) then
       if s >= 30 and s <= 50 then
         return F.HP(s) * B().BOSS_HP_MULT_MID
-      end -- r3 B18
+      end
       return F.HP(s) * B().BOSS_HP_MULT
     end
     if F.IsBoss(s) and s >= 30 and s <= 50 then
       return F.HP(s) * B().MINIBOSS_HP_MULT_MID
-    end -- r4 B23
+    end
     if F.IsBoss(s) then
       return F.HP(s) * B().MINIBOSS_HP_MULT
     end
@@ -46,9 +42,8 @@ do
     return math.min(B().ZONES, math.floor((s - 1) / B().STAGES_PER_ZONE) + 1)
   end
   F.Pos = function(s)
-    return (s - 1) % B().STAGES_PER_ZONE + 1   -- nonneg (stage >= 1)
+    return (s - 1) % B().STAGES_PER_ZONE + 1
   end
-  -- next boss stage at or after s
   F.NextBossStage = function(s)
     return math.ceil(s / B().BOSS_EVERY) * B().BOSS_EVERY
   end
@@ -56,9 +51,8 @@ do
     if M.raider.u >= 3 then
       return (1 + B().RAIDER_GOLD) * Ti().FloodGold()
     end
-    return Ti().FloodGold()   -- New Tide: kill, boss, offline and world gold
+    return Ti().FloodGold()
   end
-  -- Gold per kill (plan 5.1)
   F.Gold = function(s, boss, rare, M)
     local b = B()
     local g = math.ceil(b.GOLD_LIN * s + F.HP(s) / b.GOLD_DIV) + b.GOLD_PLUS
@@ -74,9 +68,8 @@ do
     if M.tidehunter.u >= 3 then
       return B().BOSS_TIMER + B().TIDE_TIMER + Ti().TimerPlus()
     end
-    return B().BOSS_TIMER + Ti().TimerPlus()   -- New Tide: Spells 25
+    return B().BOSS_TIMER + Ti().TimerPlus()
   end
-  -- ------------------------------------------------------------ murlocs
   F.Milestones = function(n)
     local b = B()
     if n < b.MILESTONE_FIRST then
@@ -119,7 +112,6 @@ do
     end
     return 0
   end
-  -- New Tide: Cost, Bundle, MaxAfford (via both) and UpgradeCost share Tide.CostMult() (Murlocs 50); SelfCost does not
   F.Cost = function(i, n)
     return F.Murloc(i).cost * Ti().CostMult() * B().COST_GROWTH ^ n
   end
@@ -135,9 +127,8 @@ do
     end
     if not (gold - gold == 0) then
       return 0
-    end -- tide1c K1: +Inf / NaN gold (a broken save) would loop forever
+    end
     local k = math.floor(math.log(gold * (g - 1) / c + 1) / math.log(g))
-    -- guard against float edges
     while k > 0 and F.Bundle(i, n, k) > gold do
       k = k - 1
     end
@@ -153,8 +144,6 @@ do
     end
     return t
   end
-  -- Damage per second of murloc i (plan 5.1)
-  -- Damage of one murloc of this rank (tooltip); before the first hire: base x upgrades
   F.MurlocEach = function(M, i)
     local m = F.Murloc(i)
     local n = M[m.id].n
@@ -182,11 +171,8 @@ do
     if m.id == "murkeye" and e.u >= 3 then
       d = d * (1 + b.MURKEYE_PER * F.HiredTotal(M))
     end
-    return d * Ti().MurlocMult()   -- New Tide: flood x Murlocs path
+    return d * Ti().MurlocMult()
   end
-  -- tide1b T1: Murky (companion 1) fights along from the first New Tide; 0 before, so run 1 is unchanged.
-  -- tide1c K3: Murky reads the live save (Mrgl.db prestige), not the argument M: in before/after comparisons with a
-  -- hypothetical M he is a constant. Tools that build an M for another prestige state must account for that
   F.MurkyDPS = function()
     return Ti().MurkyDPS()
   end
@@ -203,7 +189,6 @@ do
   F.UpgradeReq = function(tier)
     return U.At(B().UPG_AT, tier)
   end
-  -- ------------------------------------------------------------ self
   F.ClickBase = function(S)
     return (1 + S.click) * 2 ^ math.floor(S.click / B().CLICK_DOUBLE_EVERY)
   end
@@ -214,7 +199,6 @@ do
     end
     return p
   end
-  -- New Tide: x Tide.ClickMult() on the whole hit (echo, whelps, LEEROY and auto clicks too)
   F.ClickDamage = function(M, S, dps)
     return (F.ClickBase(S) + F.EchoShare(M, S) * dps) * Ti().ClickMult()
   end
@@ -223,10 +207,10 @@ do
     if candle then
       p = p + B().CANDLE_CRIT
     end
-    return math.min(1, p + Ti().CritPlus())   -- New Tide: Self-Click 25
+    return math.min(1, p + Ti().CritPlus())
   end
   F.CritMult = function(S)
-    return B().CRITM_BASE + B().CRITM_STEP * S.critdmg + Ti().CritDmgPlus()   -- Self-Click 50
+    return B().CRITM_BASE + B().CRITM_STEP * S.critdmg + Ti().CritDmgPlus()
   end
   F.ClickExpected = function(M, S, dps, candle)
     return F.ClickDamage(M, S, dps) * (1 + F.CritChance(S, candle) * (F.CritMult(S) - 1))
@@ -242,7 +226,7 @@ do
     if id == "critdmg" then
       return b.CRITM_MAX
     end
-    return 0 -- 0 = no cap
+    return 0
   end
   F.SelfCost = function(id, r)
     local b = B()
@@ -261,7 +245,6 @@ do
     local mx = F.SelfMax(id)
     return mx > 0 and r >= mx
   end
-  -- ------------------------------------------------------------ effective DPS (Best Buy, plan 5.2)
   F.EffDPS = function(M, S, c)
     local d = F.SquadDPS(M)
     local v = d + c * F.ClickExpected(M, S, d, false)
@@ -271,16 +254,12 @@ do
     end
     return v
   end
-  -- ------------------------------------------------------------ boss readiness
-  -- r2 B4: R = {mrgl, whelps, candle, leeroy} = ability ready (and opener on). Expected burst damage of
-  -- the opener without own clicks.
   F.Burst = function(M, S, R)
     local d = F.SquadDPS(M)
     local click = F.ClickDamage(M, S, d)
     local cm = F.CritMult(S)
     local b = B()
     local t = 0
-    -- New Tide: ability power and buff length via Abilities.Power / BuffDur (Spells path)
     if R.mrgl == true then
       t = t + click + Pw("MRGL_DPS_SEC") * d
     end
@@ -300,7 +279,6 @@ do
     end
     return t
   end
-  -- LEEROY crit rush with own clicks (yellow check only)
   F.Rush = function(M, S, R, cps)
     if R.leeroy ~= true then
       return 0
@@ -308,7 +286,6 @@ do
     local d = F.SquadDPS(M)
     return B().LEEROY_CRIT_SEC * Ti().BuffMult() * cps * F.ClickDamage(M, S, d) * F.CritMult(S)
   end
-  -- returns "green", "greenAbil", "yellow" or "grey" for the boss at stage bs
   F.Ready = function(M, S, bs, cps, R)
     local b = B()
     local d = F.SquadDPS(M)
@@ -328,13 +305,11 @@ do
     end
     return "grey"
   end
-  -- r2 B5: 0..1 share of a sure win without own clicks
   F.Strength = function(M, S, bs, R)
     local d = F.SquadDPS(M)
     local need = B().READY_GREEN * F.EnemyHP(bs)
     return math.min(1, (d * F.BossTimer(M) + F.Burst(M, S, R)) / need)
   end
-  -- ------------------------------------------------------------ gold rates
   F.GoldRate = function(M, S, s, cps)
     local d = F.SquadDPS(M)
     local total = d + cps * F.ClickExpected(M, S, d, false)
@@ -350,6 +325,6 @@ do
       return 0
     end
     local t = math.min(dt, b.OFFLINE_MAX)
-    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) / d + b.RESPAWN)   -- New Tide: Murlocs 25
+    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) / d + b.RESPAWN)
   end
 end

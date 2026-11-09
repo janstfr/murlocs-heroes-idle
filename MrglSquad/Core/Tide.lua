@@ -1,8 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/Tide.lua equivalent: New Tide (prestige), ngplus-plan C2-C4.
--- Saved: db.prestige = { count, best, last, paths = { m, s, a }, trophies = { nef } }. Every New Tide adds exactly 1 point to
--- one path, forever (no respec, no free points). Without db (or with Total() = 0) every factor is 1, every plus value 0 and
--- the offline rate OFFLINE_RATE, so run 1 is unchanged.
 Mrgl.Core = Mrgl.Core or {}
 do
   local B, F, Cb
@@ -19,11 +15,8 @@ do
   function Cb()
     return Mrgl.Core.Combat
   end
-
   local PATHS = { "m", "s", "a" }
-  local CAST = { "candle", "whelps", "mrgl", "leeroy" } -- C4 auto-cast order
-
-  -- ------------------------------------------------------------ points
+  local CAST = { "candle", "whelps", "mrgl", "leeroy" }
   local function paths()
     local db = Mrgl.db
     if db == nil or db.prestige == nil then
@@ -47,9 +40,6 @@ do
   T.Has = function(p, lvl)
     return T.Points(p) >= lvl
   end
-
-  -- ------------------------------------------------------------ unlock and blockers
-  -- Standing before Ragnaros (gate to stage 100 open) counts as reached
   T.Reached = function()
     local db = Mrgl.db
     local gate = 0
@@ -61,7 +51,6 @@ do
   T.Avail = function()
     return T.Reached() >= B().TIDE_STAGE
   end
-  -- "combat" first (display order of plan R2: combat before boss before stage); rt.popup does not count
   T.Blocked = function()
     if C.rt.inCombat then
       return "combat"
@@ -74,10 +63,6 @@ do
   T.Ready = function()
     return T.Avail() and T.Blocked() == nil
   end
-
-  -- ------------------------------------------------------------ factors (C2)
-  -- Formula calls these in every damage / cost / gold step: they are computed once per point set (m, s, a) and cached
-  -- (same arithmetic, so the values are identical; the cache follows any change of the points by value)
   local fc = { m = -1, s = -1, a = -1 }
   local function cur()
     local m, s, a = 0, 0, 0
@@ -138,7 +123,6 @@ do
     if m >= 50 then
       fc.cost = 1 - b.TIDE_DISCOUNT
     end
-    -- tide1b T1: Murky fights along from the first New Tide: one Tinyfin's base DPS x MurlocMult (flood x Murlocs path)
     fc.murky = 0
     if tot >= 1 then
       fc.murky = U.At(Mrgl.Data.Murlocs, 1).dps * fc.murloc
@@ -160,7 +144,6 @@ do
   T.SpellMult = function()
     return cur().spell
   end
-  -- display factor of a path row (R3): murloc damage without the flood, click damage, ability power
   T.PathMult = function(p)
     if p == "s" then
       return cur().click
@@ -197,16 +180,12 @@ do
   T.CostMult = function()
     return cur().cost
   end
-  -- tide1b T1: Murky's damage per second (0 before the first New Tide). Not buyable, not in counts, ranks or Best Buy;
-  -- F.SquadDPS adds it, so offline gold, the squad number and boss readiness all see it
   T.MurkyDPS = function()
     return cur().murky
   end
   T.AutoBuy = function()
     return T.Total() >= 1
   end
-
-  -- ------------------------------------------------------------ data lookups (for the UI)
   T.Path = function(p)
     local l = Mrgl.Data.Tide.paths
     for i = 1, U.Len(l) do
@@ -216,7 +195,6 @@ do
     end
     return nil
   end
-  -- next milestone of path p not reached yet (nil when all are reached)
   T.NextMs = function(p)
     local d = T.Path(p)
     if d == nil then
@@ -230,8 +208,6 @@ do
     end
     return nil
   end
-  -- what a New Tide into path p brings now: "first" (Quartermaster, Murky) at Total() = 0, then the milestone ids
-  -- reached with points + 1 (e.g. { "first", "m10" })
   T.Gains = function(p)
     local out = {}
     local d = T.Path(p)
@@ -250,7 +226,6 @@ do
     end
     return out
   end
-  -- definition of a milestone, a "first" entry or a trophy by id
   T.Def = function(id)
     local D = Mrgl.Data.Tide
     for i = 1, U.Len(D.first) do
@@ -273,7 +248,6 @@ do
     end
     return nil
   end
-  -- companion slot 1-3 (K): Murky after the first New Tide, Tidecaller at Murlocs 10, Bagurgle at Murlocs 100
   T.Companion = function(slot)
     if slot == 1 and T.Total() >= 1 then
       return T.Def("murky")
@@ -286,7 +260,6 @@ do
     end
     return nil
   end
-  -- the setting behind a toggle is free once its milestone is reached
   T.ToggleFree = function(key)
     if key == "autobuy" then
       return T.AutoBuy()
@@ -299,7 +272,6 @@ do
     end
     return false
   end
-  -- flips settings[key] when free; returns the new value (false when locked)
   T.Toggle = function(key)
     local s = Mrgl.db.settings
     if not T.ToggleFree(key) then
@@ -313,11 +285,6 @@ do
     local db = Mrgl.db
     return db.prestige.trophies[id] == true
   end
-
-  -- ------------------------------------------------------------ New Tide (C3)
-  -- committed = true: the player pressed New Tide and the veil is already up (UI F, 0.3 s later). WoW combat that began
-  -- in those 0.3 s does not cancel it: the reset touches only our own data (no protected call), and a veil without a
-  -- reset would be a moment without effect. A boss fight still blocks (it cannot start during the popup and veil).
   T.Rise = function(path, committed)
     local db = Mrgl.db
     local rt = C.rt
@@ -325,7 +292,7 @@ do
     local bl = T.Blocked()
     if committed == true and bl == "combat" and not db.boss.active then
       bl = nil
-    end -- New Tide guard (orchestrator)
+    end
     if not T.Avail() or bl ~= nil or not T.IsPath(path) then
       return false
     end
@@ -337,13 +304,12 @@ do
     pr.count = pr.count + 1
     pr.last = path
     pr.best = math.max(pr.best, reached)
-    -- C3a: run state back to a new game; abilities, settings, stats, world, prestige stay
     db.gold = b.START_GOLD
     db.stage = 1
     db.kills = 0
     db.maxStage = 1
     db.enemyHp = F().EnemyHP(1)
-    Mrgl.Core.Combat.NewLife() -- j5 K5
+    Mrgl.Core.Combat.NewLife()
     db.enemyRare = false
     db.rareStage = 0
     local bo = db.boss
@@ -359,7 +325,6 @@ do
     end
     db.buffs.whelps = 0; db.buffs.candle = 0; db.buffs.leeroy = 0
     db.autoFailDps = {}
-    -- runtime (inCombat and popup stay as they are)
     rt.gateFired = false
     rt.respawn = 0
     rt.queued = 0
@@ -378,9 +343,6 @@ do
     C.Fire("SAVE", {})
     return true
   end
-
-  -- ------------------------------------------------------------ automation (C4), called from Tick.Step
-  -- LEEROY only while a boss fight runs (checked per ability: a MRGLGLGL! kill at the start ends the fight)
   local function autoCast()
     local A = Mrgl.Core.Abilities
     local rt = C.rt
@@ -401,7 +363,6 @@ do
     local db = Mrgl.db
     return T.Has("a", 10) and db.settings.autocast == true and not C.rt.inCombat
   end
-  -- Boss.Start(true): every ready ability right after the A4 reset, LEEROY included (Orchestrator v2 no. 1)
   T.BossOpen = function()
     if T.AutoCastOn() then
       autoCast()
@@ -411,7 +372,6 @@ do
     local db = Mrgl.db
     local rt = C.rt
     local b = B()
-    -- auto-click: Self-Click 10 / 100
     local cps = T.AutoCps()
     if cps > 0 and db.settings.autoclick == true then
       rt.autoClickAcc = rt.autoClickAcc + dt * cps
@@ -420,7 +380,6 @@ do
         Cb().Click(false, "auto")
       end
     end
-    -- auto-cast: once per full game second; LEEROY only in a boss fight
     local sec = math.floor(rt.clock)
     if sec ~= rt.castSec then
       rt.castSec = sec
@@ -428,7 +387,6 @@ do
         autoCast()
       end
     end
-    -- auto-buy: Buy best every TIDE_AUTOBUY_SEC game seconds (also minimized, hidden, in catch-up and WoW combat)
     local slot = math.floor(rt.clock / b.TIDE_AUTOBUY_SEC)
     if slot ~= rt.autoBuyT then
       rt.autoBuyT = slot
@@ -441,7 +399,6 @@ do
       end
     end
   end
-  -- login: the offline jump of the clock must not count as a passed auto-buy / auto-cast slot
   T.Sync = function()
     local rt = C.rt
     rt.castSec = math.floor(rt.clock)

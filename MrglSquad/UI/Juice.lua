@@ -1,9 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Juice.lua equivalent: numbers (r2 L2), headline (L3), coins (L4), flash, sparks, whelps,
--- one-glow rule (plan 3.6, 6.1; r2 L5 calm, L6 polish, W3 hidden window, W6 ready flash).
--- Everything is pooled and built once; nothing is created while playing.
--- W3: every juice handler starts with "if not MrglSquadFrame:IsVisible() then return end";
--- state displays come from Main.Refresh. OnShow() drops all running juice when the window comes back.
 Mrgl.UI = Mrgl.UI or {}
 do
   local buyKey
@@ -36,27 +31,19 @@ do
   function visible()
     return MrglSquadFrame ~= nil and MrglSquadFrame:IsVisible()
   end
-  local glowOwner -- current one-glow element
+  local glowOwner
   local lastStage = 0
-  -- ------------------------------------------------------------ L2 number lanes (relative to the enemy centre)
-  -- r3 L7: lane R in the free field under the boss button (x +80, start y -47, 13 px: j1 A2 un-rounded numbers sit up to
-  -- 1 px higher, 14 px touched the boss +n%).
-  -- r4 L13: lanes R and L show exactly one number each: hits within 0.3 s (R) / 0.5 s (L) add up on it and pop
-  -- (1.15 -> 1 in 0.1 s); a new number hides the old one at once, without a fade (hard).
-  -- r3 L8: lane A inside the icon (y +24, 8 px, FRIZ 22); lane C centred, see number() for the rush rules.
-  -- j1 A1 #28: pop = first pop of a new number, bpop = pop of a number that takes a bundled hit (C 1.15, A 1.2, R/L 1.05)
   local LANES = { R = { font = "FRIZ", size = 13, c = "white", x = 80, y = -47, dist = 13, dur = 0.5, fade = 0.25, cap = 1, pool = 2, pop = 1, bpop = 1.05, hard = true, bundle = 0.3, popDur = 0.1 }, L = { font = "ARIALN", size = 11, c = "squad", x = -66, y = -38, dist = 24, dur = 0.8, fade = 0.45, cap = 1, pool = 2, pop = 1, bpop = 1.05, hard = true, bundle = 0.5, popDur = 0.1 }, C = { font = "FRIZ", size = 20, c = "crit", x = 0, y = 6, dist = 22, dur = 0.7, fade = 0.4, cap = 2, pool = 3, pop = 1.15, bpop = 1.15, bundle = 0.3 }, A = { font = "FRIZ", size = 22, c = "ability", x = 0, y = 24, dist = 8, dur = 1.0, fade = 0.65, cap = 1, pool = 2, pop = 1.2, bpop = 1.2 } }
   local LANE_KEYS = { "R", "L", "C", "A" }
-  J.LANES = LANES -- j1: read by the motion checks (j1-motion.json row 28)
+  J.LANES = LANES
   local BUNDLE = 0.15; local KILL_FADE = 0.08
-  -- r3 L8 rush (LEEROY or candle buff): lane C keeps one number, hits within 0.5 s add up and pop 1.1 -> 1 in 0.1 s (j1 #28)
   local RUSH_BUNDLE = 0.5; local RUSH_POP = 1.1; local RUSH_POP_DUR = 0.1; local POP_DUR = 0.15
   J.RUSH_POP = RUSH_POP
   local C_UNDER_A = -14; local C_SECOND = 16
   function rush()
     return Core().Combat.LeeroyActive() or Core().Combat.CandleActive()
   end
-  local bossPause = false -- after a boss kill until the next spawn: no numbers (L2)
+  local bossPause = false
   local shownQueued = 0; local skipHits = 0
   local squadT = 0; local whelpSum = 0; local whelpT = 0
   function laneColor(l)
@@ -87,14 +74,13 @@ do
     local l = LANES[r.key]
     local p = math.min(1, r.t / l.dur)
     local y = l.y + r.dy + l.dist * (1 - (1 - p) * (1 - p))
-    local a = 1 -- j5 K1: the fade runs on its own clock (fa): an own click re-lights the R number, it does not move back
+    local a = 1
     if r.fa > l.fade then
       a = math.max(0, 1 - (r.fa - l.fade) / (l.dur - l.fade))
     end
     if not r.live then
       a = a * math.max(0, 1 - r.k / KILL_FADE)
     end
-    -- j1 A2: a moving number is not rounded to whole units (rounding made it step); only static lines are (W5)
     r.f:SetPoint("CENTER", W().enemy, "CENTER", r.x, y)
     r.f:SetAlpha(a)
   end
@@ -115,11 +101,6 @@ do
       end
     end
   end
-  -- amount on a lane: bundles hits within BUNDLE seconds (calm: R one number per 0.3 s), keeps the lane cap
-  -- j5 K1/K1+ (Jan: "bei jedem Klick soll auch feedback kommen, dass man angreift"): own = an own click. It shows in
-  -- the boss pause too, and on lane R a bundled click re-lights the number (alpha back to 1, no pop, no move).
-  -- j5 K5 (c): in fast mode a crit goes to lane R (small, beside the face, crit colour), so at most 2 numbers, none on
-  -- the face.
   function setNumberColor(r, crit)
     r.crit = crit
     local c = laneColor(LANES[r.key])
@@ -138,7 +119,7 @@ do
     local win = BUNDLE
     if l.bundle ~= nil then
       win = l.bundle
-    end -- crits: 0.3 s, so two live crits never cover each other
+    end
     if inRush then
       win = RUSH_BUNDLE
     end
@@ -149,7 +130,7 @@ do
     if inRush then
       cap = 1
     end
-    local quietN = (key == "C" or key == "R") and J.FastFarm() -- j4 H2 (c): fast mode: <= 2 click numbers, no pop
+    local quietN = (key == "C" or key == "R") and J.FastFarm()
     if quietN and key == "C" then
       cap = 1
     end
@@ -170,7 +151,7 @@ do
     if newest ~= nil and now - newest.born < win then
       newest.amount = newest.amount + amount
       newest.f.text:SetText(U.Short(newest.amount))
-      if key == "R" then -- j5 K1: re-light (the bundle stays where it is); a crit inside turns it crit-coloured
+      if key == "R" then
         newest.fa = 0
         if crit == true and not newest.crit then
           setNumberColor(newest, true)
@@ -194,7 +175,6 @@ do
       return
     end
     if l.hard == true then
-      -- r4 L13: hard lanes (R, L): every number of the lane goes at once, also one still fading out
       for hs = 1, U.Len(pool) do
         local rh = U.At(pool, hs)
         if rh.active then
@@ -204,7 +184,7 @@ do
     elseif live >= cap and oldest ~= nil then
       killNumber(oldest, KILL_FADE)
     end
-    if quietN and key == "C" then -- j4 H2 (c): the one crit number replaces the old one at once
+    if quietN and key == "C" then
       for qc = 1, U.Len(pool) do
         local rq = U.At(pool, qc)
         if rq.active then
@@ -213,7 +193,6 @@ do
       end
     end
     if key == "A" then
-      -- the ability number takes the middle: running crits give way at once (L8: no overlap)
       local cp = LANES.C.list
       for c = 1, U.Len(cp) do
         local rc = U.At(cp, c)
@@ -222,7 +201,7 @@ do
         end
       end
     end
-    local other -- a number of this lane that stays live next to the new one
+    local other
     for o = 1, U.Len(pool) do
       local ro = U.At(pool, o)
       if ro.live then
@@ -266,12 +245,9 @@ do
     if key == "C" then
       if laneLive("A") then
         use.dy = C_UNDER_A - l.y
-      -- L8: under a live MRGL/LEEROY number the crit starts at y -14
       elseif other ~= nil then
         use.dy = C_SECOND
-      end -- L8: outside the rush the second crit starts 16 px higher
-      -- The older crit (bundle 0.3 s / rush 0.5 s) has already risen 15-22 px and would sit right under the new one
-      -- (measured overlap up to 100 %), so it goes at once instead of fading: never two crits on top of each other.
+      end
       for oc = 1, U.Len(pool) do
         local rc2 = U.At(pool, oc)
         if rc2.active and rc2 ~= use then
@@ -306,7 +282,7 @@ do
       for i = 1, U.Len(pool) do
         local r = U.At(pool, i)
         if r.active then
-          if fastNow and r.key == "C" and r.live then -- j5 K5 (c): fast mode: off the face
+          if fastNow and r.key == "C" and r.live then
             killNumber(r, KILL_FADE)
           end
           local l = LANES[r.key]
@@ -324,7 +300,6 @@ do
       end
     end
   end
-  -- boss win: all running numbers fade out in 0.1 s
   function fadeAllNumbers(dur)
     for n = 1, 4 do
       local pool = LANES[U.At(LANE_KEYS, n)].list
@@ -336,27 +311,15 @@ do
       end
     end
   end
-  -- ------------------------------------------------------------ L3 headline (one at a time, queue of 3)
-  -- j1 G: the gold moment (boss = "victory", rare/quest/level/zone = "bonus"): title FRIZ 16 gold, amount rolls 0.6 s,
-  -- stands 1.4 s (dur 2.0 from the show), fades out in 0.4 s (out). j1b G1: the amount stands in the same row (bn.layout)
-  local HL = { leeroy = { size = 16, flags = "OUTLINE", c = "leeroy", dur = 1.0 }, victory = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, bonus = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, zone = { size = 18, flags = "OUTLINE", c = "gold", dur = 2.0 }, retreat = { size = 14, flags = "OUTLINE", c = "text", dur = 1.2 }, rare = { size = 14, flags = "OUTLINE", c = "rare", dur = 1.2 }, tide = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 } } -- New Tide F/T: like victory without an amount, alpha only
+  local HL = { leeroy = { size = 16, flags = "OUTLINE", c = "leeroy", dur = 1.0 }, victory = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, bonus = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, zone = { size = 18, flags = "OUTLINE", c = "gold", dur = 2.0 }, retreat = { size = 14, flags = "OUTLINE", c = "text", dur = 1.2 }, rare = { size = 14, flags = "OUTLINE", c = "rare", dur = 1.2 }, tide = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 } }
   local HL_W = 220; local HL_OUT = 0.25; local REWARD_ROLL = 0.6
-  local hic = { size = 20, gap = 6 } -- tide1b T3: a milestone line's icon left of its text (tex, fade)
+  local hic = { size = 20, gap = 6 }
   J.hic = hic
   local hq = {  }; local hcur
   local hf; local hfs; local hIn; local hOut; local hreward
-  -- tide1c C1/C8: fast farming = kills per second over the last 2 s, on at 1.5, off at 1.0 (hysteresis). While on, a
-  -- normal kill swaps the enemy icon without the die/spawn fade, and headlines of these kinds come at most every 8 s, only
-  -- on an empty row (the rest is dropped, never queued; a dropped gold moment only rolls the head's gold)
-  -- swap = the last kill skipped its die fade, so its spawn skips the spawn fade too
-  -- j4 H2 (Jan: "es vibriert dann alles und flackert"): fast mode by enemy lifetime. On when the mean lifetime of the
-  -- last N normal kills is < LIFE_ON s or at >= RATE kills/s (over WIN s); off when the mean (with the living enemy's
-  -- age once it is older than the mean) is > LIFE_OFF s and the rate is below RATE. The first BOSS_T s after a boss win
-  -- always count (the next stages are trivial). Boss kills do not count as a lifetime.
   local ff = { times = {}, lives = {}, born = -1, on = false, swap = false, WIN = 5, RATE = 0.6, N = 5, LIFE_ON = 1.5, LIFE_OFF = 2.5,
     BOSS_T = 3, bossT = -100, GAP = 8, last = -100, punchT = -100, PUNCH_GAP = 0.6,
     kinds = { victory = true, bonus = true, rare = true, zone = true } }
-  -- the state now (between kills too: a pause or a boss fight ends fast farming)
   ff.check = function()
     local now = GetTime()
     while U.Len(ff.times) > 0 and now - U.At(ff.times, 1) > ff.WIN do
@@ -368,10 +331,10 @@ do
       sum = sum + U.At(ff.lives, i)
     end
     local life = 99
-    if n >= 3 or (ff.on and n > 0) then -- j4 H5: an early start (click kill) keeps its own mean
+    if n >= 3 or (ff.on and n > 0) then
       life = sum / n
     end
-    if ff.born >= 0 and now - ff.born > life then -- a pause or a long fight counts as it runs
+    if ff.born >= 0 and now - ff.born > life then
       life = now - ff.born
     end
     if not ff.on and ((n >= 3 and life < ff.LIFE_ON) or rate >= ff.RATE) then
@@ -392,8 +355,6 @@ do
       while U.Len(ff.lives) > ff.N do
         U.Remove(ff.lives, 1)
       end
-      -- j4 H5 (UX-B S2): a click kill of an enemy younger than LIFE_ON s is fast mode at once (the first one-shot kill
-      -- has no die and spawn fade)
       if click == true and ff.born >= 0 and now - ff.born < ff.LIFE_ON then
         ff.on = true
       end
@@ -404,8 +365,6 @@ do
   ff.spawn = function()
     ff.born = GetTime()
   end
-  -- j4 H2 (b): punch and click flash: never on the killing hit (M.Hit punches after the click; a crit checks the HP),
-  -- at most one per PUNCH_GAP s, none in fast mode
   ff.punchOk = function()
     if ff.check() or GetTime() - ff.punchT < ff.PUNCH_GAP or not canPunch() or Mrgl.db.enemyHp <= 0 then
       return false
@@ -429,21 +388,8 @@ do
   end
   J.FastFarmReset = function()
     ff.reset()
-  end -- tests: a state that farmed fast before
-  local bn = { outB = nil } -- j1 G: the 0.4-s fade out of the gold moment, helpers (J.Bonus); j1b G1: no line 3 (no room)
-  -- j4 H1 (Jan: "die Popup Texte kommen nicht hinterher, besonders nach einem Boss kill"): the queue never runs late.
-  -- rank "tide" = the New Tide moment and the trophy (in order, never dropped: a companion is never held forever) and
-  -- LEEROY; "high" = boss victory (3), a gold moment with a rare kill (2), the rare spawn (1); "low" = zone line, the other
-  -- gold moments (level, quest, zone), retreat.
-  -- - coalesce: one pending low line (the newest; a gold moment merges into the pending one, bn.alive) and one pending
-  --   high line (a lower one gives way to a higher or equal one, never the other way round)
-  -- - priority: a high or tide line drops the pending low line
-  -- - after a boss: while a victory runs or waits, at most ONE more line waits (rec.after, the newest; a waiting zone line
-  --   only gives way to a newer zone line); it shows the current state (a zone line takes the current zone's name)
-  -- - max age: a low line older than AGE s at its turn is dropped (not the one after a boss: it waited on purpose);
-  --   the rare spawn line only shows while a rare is the enemy
-  -- - min time: a line holds >= MIN s; with a line waiting it goes out then (tide lines keep their 2 s)
-  -- A dropped zone line still switches the zone (tide1c C15), a dropped companion line still shows it (New Tide F).
+  end
+  local bn = { outB = nil }
   local hl = { MIN = 1.2, AGE = 1.5, PRIO = { victory = 3, bonus = 2, rare = 1 } }
   hl.rank = function(rec)
     if rec.kind == "tide" or rec.kind == "leeroy" then
@@ -458,7 +404,7 @@ do
     return "low"
   end
   hl.drop = function(rec)
-    endHeadline(rec) -- a dropped victory / retreat still brings the boss button back (when no other one waits)
+    endHeadline(rec)
     if rec.kind == "zone" then
       M().st.zoneDefer = false
       M().SetZone(false)
@@ -470,7 +416,6 @@ do
       bn.rec = nil
     end
   end
-  -- takes the pending lines that match (after = true: the line after a boss; else rank rk, not after) out of the queue
   hl.take = function(rk, after)
     local keep, out = {}, nil
     for i = 1, U.Len(hq) do
@@ -490,7 +435,6 @@ do
     hq = keep
     return out
   end
-  -- returns rec, or nil when it gives way at once
   hl.enqueue = function(rec)
     local rk = hl.rank(rec)
     local old
@@ -540,7 +484,6 @@ do
     U.Insert(hq, rec)
     return rec
   end
-  -- the next line to show (stale ones are dropped on the way), or nil
   hl.next = function()
     while U.Len(hq) > 0 do
       local rec = U.Remove(hq, 1)
@@ -561,15 +504,13 @@ do
     end
     return nil
   end
-  J.HeadlineQueue = function() -- tests: the waiting lines
+  J.HeadlineQueue = function()
     local out = {}
     for i = 1, U.Len(hq) do
       U.Insert(out, U.At(hq, i).text)
     end
     return out
   end
-  -- shrink to 11 px, then cut with an ellipsis (the full text stays in the enemy tooltip, N7)
-  -- j1b G1: maxW = the room left of the amount in a gold moment (default HL_W). j1c M3: minS = the smallest size (default 11)
   function fitText(fs, size, flags, text, maxW, minS)
     local s = size
     local mw = HL_W
@@ -589,16 +530,15 @@ do
     if fs:GetStringWidth() <= mw then
       return
     end
-    local n = strlenutf8(text)   -- characters, not bytes (port-plan 2.3)
+    local n = strlenutf8(text)
     while n > 1 do
       n = n - 1
-      fs:SetText(utf8Head(text, n) .. "...") -- port p2: ASCII dots (U+2026 may be missing in FRIZQT__)
+      fs:SetText(utf8Head(text, n) .. "...")
       if fs:GetStringWidth() <= mw then
         return
       end
     end
   end
-  -- the first n UTF-8 characters of t (JS text.substring(0, n) for text without surrogate pairs)
   function utf8Head(t, n)
     local i = 1
     local chars = 0
@@ -619,17 +559,10 @@ do
     return string.sub(t, 1, i - 1)
   end
   J.FitText = fitText
-  -- tide1c C14: no boss quote headline any more (no flavour quotes)
-  -- r3 F2: the victory headline carries the reward "+{gold}" under it, rolling up from 0 in 0.5 s.
-  -- j1 G: returns the record (the gold moment merges into it, W2). j1b G1: alt = the shorter title when the text
-  -- would be cut next to the amount (boss: the name without "defeated!")
-  -- j1c M3: short = the boss's shortName title, tried before alt ("Victory!", the last fallback)
   J.Headline = function(kind, text, gold, alt, short)
     if not visible() then
       return nil
     end
-    -- tide1c C8; j4 H1: the zone line after a boss win is the one "current state" line: the 3 s after the win alone
-    -- (H2 d) do not hold it back, only real fast farming does
     if ff.kinds[kind] == true and (kind ~= "zone" or (ff.check() and ff.on)) then
       if ff.quiet() then
         return nil
@@ -637,7 +570,7 @@ do
       ff.last = GetTime()
     end
     local rec = { kind = kind, text = text, phase = "nameOut", t = 0, wait = 0, gold = 0, roll = 0, from = 0, life = 0, born = GetTime() }
-    if kind == "bonus" then -- j4: the bundle decides the rank (a rare kill: high)
+    if kind == "bonus" then
       rec.b = bn.nextB
       bn.nextB = nil
     end
@@ -652,7 +585,6 @@ do
     end
     local cut = false
     if hcur ~= nil then
-      -- LEEROY never waits (its hit lands 0.3 s after the button)
       if kind == "leeroy" and hcur.kind ~= "victory" and hcur.kind ~= "zone" then
         cut = true
       end
@@ -678,7 +610,7 @@ do
       return rec
     end
     if kind == "leeroy" then
-      local front = { rec } -- Lua: table.insert(hq, 1, rec)
+      local front = { rec }
       do
         local i = 1
         while i <= U.Len(hq) do
@@ -687,7 +619,7 @@ do
         end
       end
       hq = front
-    elseif hl.enqueue(rec) == nil then -- j4 H1 (tide1c C15 in hl.drop)
+    elseif hl.enqueue(rec) == nil then
       return nil
     end
     if hcur == nil then
@@ -712,7 +644,6 @@ do
       rec.phase = "nameOut"
     end
   end
-  -- j1 G: the amount rolls from rec.from to rec.gold in REWARD_ROLL (ease-out); a merge restarts it from the shown value
   function setReward(rec)
     if (rec.kind ~= "victory" and rec.kind ~= "bonus") or rec.gold <= 0 then
       hreward:SetText("")
@@ -721,7 +652,7 @@ do
     hreward:SetText(U.Fill(S().PLUS, { v = U.Short(bn.rewardShown(rec)) }))
   end
   function showHeadline(rec)
-    J.CoinsAbort() -- r5 C1
+    J.CoinsAbort()
     local st = HL[rec.kind]
     hcur = rec
     rec.phase = "hold"
@@ -729,7 +660,7 @@ do
     rec.roll = 0
     rec.life = 0
     M().st.nameTarget = 0
-    bn.layout(rec) -- j1b G1: title (and the amount of a gold moment) in the row
+    bn.layout(rec)
     K().SetTextColor(hfs, C()[st.c])
     if st.flags == "" then
       hfs:SetShadowOffset(1, -1)
@@ -747,16 +678,16 @@ do
     if rec.kind == "zone" then
       M().st.zoneDefer = false
       M().SetZone(false)
-    end -- tint crossfade in parallel
+    end
     if rec.kind == "victory" then
       silhouette()
     end
     if rec.kind == "victory" or rec.kind == "bonus" then
       bn.shown(rec)
-    end -- j1 G: sparks
+    end
     if rec.comp ~= nil then
       M().TideShow(rec.comp)
-    end -- New Tide F: a companion / the Anyfin look comes with its line
+    end
   end
   function endHeadline(rec)
     if rec.kind == "victory" or rec.kind == "retreat" then
@@ -809,8 +740,7 @@ do
     if rec.phase == "hold" and rec.spark == true and rec.roll > REWARD_ROLL then
       rec.spark = false
       bn.burst()
-    end -- j1c M2
-    -- j4 H1: with a line waiting, a shown line goes after MIN s (tide lines keep their time)
+    end
     local due = HL[rec.kind].dur
     if U.Len(hq) > 0 and rec.kind ~= "tide" then
       due = math.min(due, hl.MIN)
@@ -868,53 +798,34 @@ do
     end
     return hfs:GetText() or ""
   end
-  -- ------------------------------------------------------------ j1 G / W2: the gold moment (J.Bonus)
-  -- One part for rare kill, boss victory and the in-world events (W1): the title in the name row (headline), "+{gold}"
-  -- right of it in the same row (j1b G1: "Level 13!  +964", never on the enemy icon) rolling up in 0.6 s (ease-out),
-  -- 8 sparks once from the amount (A1 #6), the gold in the head rolling up at the same time.
-  -- j1b G1: the enemy icon fades to 0.35 while a bonus moment stands (J.EnemyDim, Main.OnUpdate); the boss victory
-  -- leaves it alone (the next enemy spawns 1.0 s after the win and is never dimmed). Line 3 is gone (no room).
-  -- W2: world gold is in the core at once; only the moment waits: for a visible window, no combat, no popup. All that
-  -- arrives within BN.BUNDLE s or waits in the queue is ONE moment (sum, title by rank Level > Quest > Zone > Rare,
-  -- quests counted). Minimized: no headline, no sparks; the head rolls the gold and "+{gold}" stands 2 s next to it.
-  -- Until its moment plays, the gold is held out of the head (J.HeldGold, like the offline popup goldHold).
-  -- The helpers live in bn (Lua: local and upvalue limits of this chunk).
   local BN = { BUNDLE = 3, SPARKS = 8, SPARK_R = 24, SPARK_RY = 0.35, SPARK_T = 0.5, SPARK_A = 0.6, SPARK_HALF = 8, PLUS = 2, SWAP = 0.15, ROLL = 0.6, ROLL_OLD = 0.3,
-               GAP = 10, EDGE = 4, MARGIN = 8, MIN_PX = 13 } -- j1b G1: sparks flat (y = 0.35 of x: they stay in the row band);
-                                    -- GAP = "  " between title and amount; EDGE = 2 px each side of the pair for outline and
-                                    -- shadow. j1c M3: the pair keeps >= MARGIN px to the row edges, the title never < MIN_PX
-  bn.wait = nil -- the waiting bundle { gold, quests, level, zones, rares }
-  bn.rec = nil -- the last "bonus" headline record (merge target, W2)
-  bn.held = 0 -- gold of the waiting bundle, kept out of the head
-  bn.rollT = 0 -- > 0 while the head rolls a moment (0.6 s instead of 0.3 s, Main.OnUpdate)
-  bn.ax = HL_W / 2 -- j1c: spark origin x in the row: in the gap, the spark's right edge 1 px left of the amount
+               GAP = 10, EDGE = 4, MARGIN = 8, MIN_PX = 13 }
+  bn.wait = nil
+  bn.rec = nil
+  bn.held = 0
+  bn.rollT = 0
+  bn.ax = HL_W / 2
   bn.sparks = {}
   bn.plusT = -1
   bn.plusGold = 0
-
   bn.build = function(f)
     local w = W()
     bn.outB = hf:CreateAnimationGroup()
     K().AddAlpha(bn.outB, 1, 0, HL.bonus.out, 0, 1)
     bn.outB:SetToFinalAlpha(true)
-    -- 8 sparks from the amount, once (own frame at the headline level, so the title fade in does not dim them)
     bn.fx = CreateFrame("Frame", "MrglSquadBonusFx", w.headLayer)
     M().SetLevel(bn.fx, M().LEVEL.headline)
     bn.fx:SetAllPoints(f)
     for i = 1, BN.SPARKS do
       local t = K().Glow(bn.fx, "spark", 16, C().gold, "OVERLAY")
-      t:SetPoint("CENTER", hf, "LEFT", bn.ax, 0) -- bn.shown moves it to the amount (a fixed point: the roll never drags it)
+      t:SetPoint("CENTER", hf, "LEFT", bn.ax, 0)
       t:SetAlpha(0)
       t.anim = t:CreateAnimationGroup()
-      -- j1c: a half ring to the left (cos < 0), so no spark ever crosses the amount (it may pass over the title)
       local ang = math.pi / 2 + (i - 0.5) / BN.SPARKS * math.pi
       K().AddMove(t.anim, math.cos(ang) * BN.SPARK_R, math.sin(ang) * BN.SPARK_R * BN.SPARK_RY, BN.SPARK_T, 0, 1, "OUT")
       K().AddAlpha(t.anim, BN.SPARK_A, 0, BN.SPARK_T, 0, 1, "IN")
       U.Insert(bn.sparks, t)
     end
-    -- minimized (W2): "+{gold}" ARIALN 12 gold for 2 s, in the head frame (shown while minimized). j1b G1 follow-up:
-    -- it takes the pips' place (LEFT of pip 1); the pips (and the boss skull) fade out meanwhile and come back. Restore
-    -- at the right stays untouched. A plain swap: alpha only, no motion
     local head = w.head
     if head == nil then
       head = w.content
@@ -924,7 +835,6 @@ do
     bn.plus:SetText("")
     bn.plus:SetAlpha(0)
   end
-  -- the amount on screen: rolls from rec.from to rec.gold in REWARD_ROLL (ease-out); a merge restarts it from here
   bn.rewardShown = function(rec)
     local x = math.min(1, rec.roll / REWARD_ROLL)
     local p = 1 - (1 - x) * (1 - x)
@@ -933,9 +843,6 @@ do
   bn.isMoment = function(rec)
     return (rec.kind == "victory" or rec.kind == "bonus") and rec.gold > 0
   end
-  -- j1b G1: a gold moment is one row "Title  +amount", centred as a pair on the FINAL amount, so the roll (the amount
-  -- grows to the right from a fixed LEFT point) never moves the title; the title shrinks/cuts into the room left of
-  -- the amount. Every other headline: the title centred, no amount.
   bn.layout = function(rec)
     local st = HL[rec.kind]
     hfs:ClearAllPoints()
@@ -947,7 +854,6 @@ do
         hfs:SetPoint("CENTER", hf, "CENTER", 0, 0)
         return
       end
-      -- tide1b T3: icon (20 px, full colour) + text, centred together; the icon fades in 0.4 s (alpha only)
       fitText(hfs, st.size, st.flags, rec.text, HL_W - hic.size - hic.gap)
       local ix = math.floor((HL_W - hic.size - hic.gap - hfs:GetStringWidth()) / 2)
       K().SetIcon(hic.tex, rec.icon)
@@ -976,10 +882,9 @@ do
     hfs:SetPoint("LEFT", hf, "LEFT", x, 0)
     hreward:ClearAllPoints()
     hreward:SetPoint("LEFT", hf, "LEFT", x + tw + BN.GAP, 0)
-    bn.ax = x + tw + BN.GAP - BN.SPARK_HALF - 1 -- j1c: from the gap, never over the amount
+    bn.ax = x + tw + BN.GAP - BN.SPARK_HALF - 1
     setReward(rec)
   end
-  -- the gold moment fades out in 0.4 s, every other headline in HL_OUT
   bn.outDur = function(rec)
     local o = HL[rec.kind].out
     if o == nil then
@@ -997,7 +902,6 @@ do
     local Mn = M()
     return Mn.IsMinimized ~= nil and Mn.IsMinimized() == true
   end
-  -- W2: a moment plays only on a visible window, out of combat, without the offline popup
   bn.canPlay = function()
     if not visible() then
       return false
@@ -1031,7 +935,6 @@ do
     into.zones = into.zones + b.zones
     into.rares = into.rares + b.rares
   end
-  -- title by rank: Level > Quest > Zone > Rare
   bn.title = function(b)
     if b.level > 0 then
       return U.Fill(S().BONUS_LEVEL, { n = b.level })
@@ -1047,7 +950,6 @@ do
     end
     return S().BONUS_RARE
   end
-  -- the head rolls the moment's gold in BN.ROLL (Main.OnUpdate reads J.GoldRoll)
   bn.release = function(gold)
     bn.held = math.max(0, bn.held - gold)
     local st = M().st
@@ -1058,8 +960,6 @@ do
     st.goldTarget = to
     bn.rollT = BN.ROLL + 0.1
   end
-  -- j1b G1 follow-up, j1c M1 sequential: swap 0..2 (0 = pips, 1 = empty, 2 = "+X"). The pips fade out in SWAP s, then
-  -- "+X" fades in in SWAP s; at the end "+X" goes first, then the pips come back. Never both at once
   bn.swapAt = function(t)
     return math.max(0, math.min(2, t / BN.SWAP, (BN.PLUS - t) / BN.SWAP))
   end
@@ -1071,12 +971,12 @@ do
       U.At(w.pips, i):SetAlpha(a)
     end
     w.bossMark:SetAlpha(a)
-    w.tideMark:SetAlpha(a) -- New Tide H: the TideMark stands at the pips' place and swaps like them
+    w.tideMark:SetAlpha(a)
   end
   bn.showPlus = function(gold)
     if bn.plusT >= 0 then
       bn.plusGold = bn.plusGold + gold
-      bn.plusT = bn.swapAt(bn.plusT) * BN.SWAP -- a merge keeps the swap where it is (no flicker) and holds again
+      bn.plusT = bn.swapAt(bn.plusT) * BN.SWAP
     else
       bn.plusGold = gold
       bn.plusT = 0
@@ -1097,7 +997,6 @@ do
     end
     bn.swapSet(bn.swapAt(bn.plusT))
   end
-  -- a waiting or running moment takes more: still queued, or on screen for less than BN.BUNDLE s
   bn.alive = function(rec)
     if rec == nil then
       return false
@@ -1132,29 +1031,26 @@ do
         rec.from = from
         rec.roll = 0
         rec.t = 0
-        bn.sparksStop() -- j1c M2: sparks still in flight would cross the new count-up (not burst yet: they wait again)
+        bn.sparksStop()
         bn.layout(rec)
       end
       return
     end
     if ff.quiet() then
       return
-    end -- tide1c C8: the gold is released (the head rolls), no line
+    end
     local nb = bn.newBundle()
     bn.merge(nb, b)
-    bn.nextB = nb -- j4: read by J.Headline (the rank needs the bundle before the line queues)
+    bn.nextB = nb
     bn.rec = J.Headline("bonus", bn.title(nb), nb.gold)
     bn.nextB = nil
     if bn.rec ~= nil then
       bn.rec.b = nb
     end
   end
-  -- a gold moment comes on screen (showHeadline): the sparks wait for the count-up (j1c M2: updateHeadline
-  -- bursts them once rec.roll is past REWARD_ROLL, so they never cross a counting amount; a merge restarts the wait)
   bn.shown = function(rec)
     rec.spark = not calm()
   end
-  -- 8 sparks once from the gap left of the final amount, in a half ring to the left (not in calm mode: rec.spark stays false)
   bn.burst = function()
     for i = 1, U.Len(bn.sparks) do
       local t = U.At(bn.sparks, i)
@@ -1163,7 +1059,6 @@ do
       K().Replay(t.anim)
     end
   end
-  -- j1c M3: the optional shortName of a boss in Data.Routes (by its name; 15 bosses, once per win)
   bn.shortName = function(name)
     local R = Mrgl.Data.Routes
     local lists = { R.alliance, R.horde, R.shared }
@@ -1175,10 +1070,9 @@ do
           return z.boss.shortName
         end
         if z.mini ~= nil and z.mini.name == name then
-          return z.mini.shortName -- j1c: mini-bosses too
+          return z.mini.shortName
         end
         if z.rares ~= nil then
-          -- enemies1 G9: the named rares too (Ma'ruk, Arnak, Vaelastrasz, Broodlord)
           for r = 1, U.Len(z.rares) do
             if U.At(z.rares, r).name == name then
               return U.At(z.rares, r).shortName
@@ -1194,8 +1088,6 @@ do
       U.At(bn.sparks, i).anim:Stop()
     end
   end
-  -- kind "rare" | "boss" | "quest" | "level" | "zone"; gold = the credited amount (already in db.gold);
-  -- n = the new level for "level"; extra = { name } for "boss"
   J.Bonus = function(kind, gold, n, extra)
     if type(gold) ~= "number" or not (gold > 0) then
       return
@@ -1203,7 +1095,7 @@ do
     if kind == "boss" then
       if not bn.canPlay() then
         return
-      end -- the victory is an on-screen moment only (BOSS_WIN)
+      end
       bn.release(0)
       if bn.min() then
         bn.showPlus(gold)
@@ -1211,8 +1103,7 @@ do
       end
       if ff.quiet() then
         return
-      end -- tide1c C8: fast farming, the row is taken or a line came < 8 s ago: gold only
-      -- j1c M3: "{name} defeated!", else "{shortName} defeated!", else "Victory!" (>= 13 px, >= 8 px margin)
+      end
       local short = bn.shortName(extra.name)
       local st2 = nil
       if short ~= nil then
@@ -1228,7 +1119,6 @@ do
     bn.add(bn.wait, kind, gold, n)
     J.BonusTick(0)
   end
-  -- every frame from the driver (runs while the window is hidden too): plays the waiting moment when it can
   J.BonusTick = function(dt)
     if bn.rollT > 0 then
       bn.rollT = math.max(0, bn.rollT - dt)
@@ -1251,9 +1141,8 @@ do
     return BN.ROLL_OLD
   end
   J.BonusHeadOnly = function()
-    return bn.min() or ff.quiet() -- tide1c C8: also a quiet fast-farming win
+    return bn.min() or ff.quiet()
   end
-  -- j1b G1: the enemy icon is dimmed while a bonus moment stands (not the boss victory: the new enemy stays clear)
   J.EnemyDim = function()
     return hcur ~= nil and hcur.kind == "bonus" and hcur.phase == "hold"
   end
@@ -1269,12 +1158,11 @@ do
       U.At(bn.sparks, i).anim:Stop()
     end
   end
-  -- dev / test-ui: the waiting bundle, held gold, the minimized "+X", the enemy dim (j1b G1)
   J.BonusDebug = function()
     local out = { held = bn.held, waiting = 0, waitGold = 0, plus = "", plusAlpha = 0, reward = J.RewardText(), headline = J.HeadlineText(),
                   dim = J.EnemyDim(), iconAlpha = W().enemyIcon:GetAlpha(), counting = false }
     if hcur ~= nil and hcur.phase == "hold" and bn.isMoment(hcur) and hcur.roll <= REWARD_ROLL then
-      out.counting = true -- j1c M2
+      out.counting = true
     end
     if bn.wait ~= nil then
       out.waiting = 1
@@ -1286,19 +1174,12 @@ do
     end
     return out
   end
-  -- ------------------------------------------------------------ New Tide F: the tide moment (alpha only)
-  -- 0.0 s the popup closes, the veil (dark blue-green, over the content, under the head row and the headline layer)
-  -- fades 0 -> 0.35 (calm 0.25) in 0.3 s; 0.3 s T.Rise(path), the UI is rebuilt behind it (enemy without spawn animation,
-  -- the zone tint at once, no zone headline) and the "tide" headline comes; 0.7 s the veil fades out in 0.6 s. Then one
-  -- "tide" line per new milestone (a new companion and the Anyfin look come with theirs). No scale, no move, no sparks.
-  -- Minimized, hidden or a new db: the veil goes at once, its headlines go; the reset happens all the same (not for a new
-  -- db). rt.popup stays true from the popup until the reset. The helpers live in td (upvalue limits).
   local TD = { IN = 0.3, HOLD = 0.7, OUT = 0.6, A = 0.35, A_CALM = 0.25 }
   local td = { t = -1, path = "m", risen = false, debug = false, rising = false, autoMrgl = false }
   J.TD = TD
   td.build = function(f)
     td.veil = CreateFrame("Frame", "MrglSquadTideVeil", f)
-    M().SetLevel(td.veil, M().LEVEL.coins + 1) -- between the content layers and the headline (+10)
+    M().SetLevel(td.veil, M().LEVEL.coins + 1)
     td.veil:SetPoint("TOPLEFT", f, "TOPLEFT", 3, -26)
     td.veil:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, 3)
     td.tex = td.veil:CreateTexture(nil, "ARTWORK")
@@ -1311,8 +1192,8 @@ do
     end)
     td.veil:SetScript("OnHide", function()
       J.TideAbort()
-    end) -- the window hides (combat with "Hide in combat", close)
-    td.veil:EnableMouse(true) -- tide1c C7: a second click on New Tide lands on the veil, not on ability 2 or the boss
+    end)
+    td.veil:EnableMouse(true)
   end
   td.alpha = function()
     local A = TD.A
@@ -1345,36 +1226,32 @@ do
     td.t = -1
     td.tex:SetAlpha(0)
     td.veil:Hide()
-    Core().rt.tideVeil = false -- tide1c C7: Boss.Start and the keys work again
+    Core().rt.tideVeil = false
   end
-  -- the path's name for TIDE_HEAD
   td.pathName = function(id)
     return Core().Tide.Path(id).name
   end
-  -- the reset (once); the TIDE / STAGE / ZONE events it fires are part of the moment (td.rising)
   td.rise = function()
     if td.risen then
       return
     end
     td.risen = true
-    if td.debug then -- /mrgl debug tide: no reset, only the line
+    if td.debug then
       if visible() and not bn.min() then
         J.Headline("tide", U.Fill(S().TIDE_HEAD, { path = td.pathName(td.path), n = Mrgl.db.prestige.paths[td.path] }))
       end
       return
     end
-    -- a gold moment on screen stays; anything else gives way to the New Tide line
     if hcur == nil or not bn.isMoment(hcur) then
       clearHeadline()
     end
     td.rising = true
-    Core().Tide.Rise(td.path, true) -- committed: combat that began under the veil does not cancel it
+    Core().Tide.Rise(td.path, true)
     td.rising = false
     Core().SetPopup(false)
-    ff.reset() -- tide1c C1: a new run starts slow
-    Core().Combat.TakeSquadDealt() -- no squad number of the old run after the reset
+    ff.reset()
+    Core().Combat.TakeSquadDealt()
     fadeAllNumbers(0.1)
-    -- behind the veil: the stage-1 enemy without spawn animation, the zone tint at once
     local w = W()
     M().LockEnemy(false)
     if J.die:IsPlaying() then
@@ -1395,7 +1272,6 @@ do
     M().SetEnemyLook()
     M().Refresh()
   end
-  -- TIDE (from Rise): mark what is new (tab dot and edges); in the moment, queue the lines and hold the companions
   td.onTide = function(p)
     local P = Mrgl.UI.Panel
     local Td = Core().Tide
@@ -1419,7 +1295,6 @@ do
       end
     end
   end
-  -- one milestone line: "{name} joins the squad." with a companion (held until the line shows), else "{name} unlocked."
   td.line = function(d, id)
     if d == nil then
       return
@@ -1436,7 +1311,7 @@ do
     end
     if id == "a50" then
       M().TideHold(0)
-    end -- the Anyfin look of slot 1 switches with its line
+    end
     rec = J.Headline("tide", U.Fill(S().TIDE_MS_NEW, { name = d.name }))
     if rec ~= nil then
       rec.icon = d.icon
@@ -1447,30 +1322,28 @@ do
   end
   J.TideLine = function(d, id)
     td.line(d, id)
-  end -- tests: one milestone line (with its icon)
-  -- Popup.TideGo: the choice is made; debug = true plays the moment without the reset (/mrgl debug tide)
+  end
   J.TideMoment = function(path, debug)
     if td.t >= 0 then
       if debug == true then
         return false
       end
-      J.TideAbort() -- a debug moment still running ends first
+      J.TideAbort()
     end
     td.path = path
     td.debug = debug == true
     td.risen = false
-    if not visible() or bn.min() then -- no window to play it in: only the reset
+    if not visible() or bn.min() then
       td.rise()
       Core().rt.tideVeil = false
       return false
     end
-    Core().rt.tideVeil = true -- tide1c C7: no boss start and no keys until the veil is gone
+    Core().rt.tideVeil = true
     td.t = 0
     td.tex:SetAlpha(0)
     td.veil:Show()
     return true
   end
-  -- minimized / hidden / back after a long frame: the veil goes at once, the moment's lines go, the reset still happens
   J.TideAbort = function()
     if td.t < 0 then
       return
@@ -1492,7 +1365,6 @@ do
     end
     M().TideRelease()
   end
-  -- a new db: no reset of the new state, nothing held
   td.reset = function()
     if td.t >= 0 then
       td.stop()
@@ -1505,7 +1377,6 @@ do
   J.TideDebug = function()
     return { t = td.t, risen = td.risen, veil = td.veil:IsShown(), veilA = td.tex:GetAlpha(), headline = J.HeadlineText() }
   end
-  -- T: the trophy line after the victory (queued behind it); never in catch-up, minimized, hidden, in combat or a popup
   td.onTrophy = function(p)
     Mrgl.UI.Panel.MarkNew(p.id)
     if Core().rt.quiet == true or not bn.canPlay() or bn.min() then
@@ -1513,7 +1384,6 @@ do
     end
     J.Headline("tide", S().NEF_HEAD)
   end
-  -- X: /mrgl debug tide | trophy (sandbox), MrglDev.tide() / trophy()
   J.DebugTide = function()
     if not visible() or bn.min() then
       return false
@@ -1527,17 +1397,13 @@ do
     td.onTrophy({ id = "nef" })
     return true
   end
-  -- ------------------------------------------------------------ pools: sparks, coins, whelps, rings
   local sparks = {  }; local sparkNext = 1
-  J.sparkPool = sparks -- j1: read by the motion checks (row 6)
+  J.sparkPool = sparks
   local coins = {  }; local coinQ = {  }; local coinLast = -10; local coinRR = 0
-  -- r4 L15 (coordinator): every coin starts >= 0.12 s after the previous one, and each pool coin has its own arc
-  -- offset at the control point (Translation only), so three coins never read as a column
-  local COIN_GAP = 0.12; local COIN_ARC = { 0, -4, -8, -2, -6, 0 } -- r5 C1: x shift left / down, all clear of the name row
-  local COIN_MAX = 3; local COIN_EXTRA_GAP = 0.12; local COIN_QUEUE = 6; local COIN_LEG2 = 0.28; local COIN_FADE = 0.1 -- more waiting coins than 6 are dropped (fast kills)   // r3 L10: at most 3 in flight, click-kill extras 0.12 s apart
+  local COIN_GAP = 0.12; local COIN_ARC = { 0, -4, -8, -2, -6, 0 }
+  local COIN_MAX = 3; local COIN_EXTRA_GAP = 0.12; local COIN_QUEUE = 6; local COIN_LEG2 = 0.28; local COIN_FADE = 0.1
   local whelps = {  }
-  local G = {} -- geometry from Main.GEO (window units, no GetCenter needed: W3)
-  -- j1 A1 #6: kills have no sparks any more; only the gold moment (J.Bonus) bursts once: 8 sparks, 24 px, alpha 0.6 -> 0, 0.5 s
+  local G = {}
   local SPARK_N = 8; local SPARK_DIST = 24; local SPARK_A = 0.6; local SPARK_DUR = 0.5
   function buildSpark()
     local t = K().Glow(W().fx, "spark", 16, C().gold, "OVERLAY")
@@ -1548,12 +1414,6 @@ do
     K().AddAlpha(t.anim, SPARK_A, 0, SPARK_DUR, 0, 1, "IN")
     return t
   end
-  -- L4: a WoW Path animation is not available in the canon, so the curve is ordered Translations.
-  -- r5 C1: the coin goes round the name row on the right and never crosses it (name row y -31..-45, headline
-  -- y -28..-48): enemy TOPRIGHT (-6,-6) -> P1 right of the row, below it (y -52 or lower) -> P2 straight up into
-  -- the gap between the head row and the name row (y -26, coin 8 x 8 = -22..-30) -> P3 under the GoldIcon -> GoldIcon
-  -- RIGHT (-4, 0). It never touches GoldText, the head buttons or Close (r3 L10). While a headline runs, no coin
-  -- flies (updateCoins holds the queue, J.CoinsAbort at a new headline). r4 L15: ends inside the icon, fades 0.1 s.
   local COIN_SIZE = 8; local COIN_X = 228; local COIN_P1Y = -52; local COIN_GAPY = -26
   local COIN_T1 = 0.2; local COIN_T2 = 0.12; local COIN_T3 = 0.14; local COIN_T4 = 0.12
   function buildCoin(idx)
@@ -1576,7 +1436,6 @@ do
     K().AddAlpha(t.anim, 1, 0, COIN_FADE, COIN_T4 - COIN_FADE, 4)
     return t
   end
-  -- r5 C1: a new headline stops coins in flight (they would cross it); the queue waits until it is gone
   J.CoinsAbort = function()
     for i = 1, U.Len(coins) do
       local c = U.At(coins, i)
@@ -1586,11 +1445,6 @@ do
       end
     end
   end
-  -- r3 L11: 22 x 22 at the height of the enemy icon, from the left, 0.12 s apart; long enough that all 5 fly at 0.5 s.
-  -- r4 L12: behind the enemy icon: regions of the surface frame (level Enemy - 1, OVERLAY over tint and spotlight).
-  -- Centre from rel. x -97 (left edge at window x 12, rel. -108) to the right icon edge (rel. +40), where they fade
-  -- out in 0.1 s: never to the boss button, never over the window edge.
-  -- enemies1 N3: no movement any more: the whelps stand at x -97 (left of the enemy icon) and only fade in and out
   local WHELP_FLY = 1.0; local WHELP_IN = 0.15; local WHELP_OUT = 0.25; local WHELP_SIZE = 22; local WHELP_X0 = -108 + 11; local WHELP_FADE = 0.2
   function buildWhelp()
     local t = K().Icon(J.whelpFx, Mrgl.Data.Icons.whelp, "OVERLAY", 2)
@@ -1623,11 +1477,11 @@ do
     local w = W()
     local geo = M().GEO
     G.sx = geo.enemyX + geo.enemyHalf - 6
-    G.sy = geo.enemyY + geo.enemyHalf - 6 -- enemy TOPRIGHT (-6,-6)
+    G.sy = geo.enemyY + geo.enemyHalf - 6
     G.cx = geo.coinCtrlX
-    G.cy = geo.coinCtrlY -- under the head row (L10)
+    G.cy = geo.coinCtrlY
     G.ex = geo.goldIconX + geo.goldIconHalf - 4
-    G.ey = geo.goldIconY -- GoldIcon RIGHT (-4, 0), r4 L15
+    G.ey = geo.goldIconY
     local i
     for n = 1, 4 do
       local key = U.At(LANE_KEYS, n)
@@ -1654,8 +1508,6 @@ do
         i = i + 1
       end
     end
-    -- j1c M5: the whelps fly in their own layer at the surface level, so a boss win can fade them out (0.2 s) by the
-    -- layer alpha (their own groups own the region alpha)
     J.whelpFx = CreateFrame("Frame", "MrglSquadWhelps", w.surface)
     J.whelpFx:SetAllPoints(w.surface)
     M().SetLevel(J.whelpFx, M().LEVEL.surface)
@@ -1675,8 +1527,6 @@ do
         i = i + 1
       end
     end
-    -- hit flash over the enemy icon. r3 K2: a region of the enemy frame (OVERLAY), so the punch scales it with the
-    -- icon and no full-size bright square stays behind a shrunken icon. j1 #3: gold vertex colour (no white), 0.10/0.15, 0.15 s
     J.flashTex = w.enemy:CreateTexture(nil, "OVERLAY", nil, 3)
     J.flashTex:SetAllPoints(w.enemyIcon)
     J.flashTex:SetTexture(Mrgl.Data.Icons.WHITE)
@@ -1685,14 +1535,12 @@ do
     J.flashTex:SetAlpha(0)
     J.flash = J.flashTex:CreateAnimationGroup()
     J.flashA = K().AddAlpha(J.flash, 0.10, 0, 0.15, 0, 1, "OUT")
-    -- portrait rings (first hire, milestone), ability unlock and ready flashes (W6). j1 #16 ring 1 -> 1.25, alpha 0.6 -> 0,
-    -- 0.6 s; #12 unlock 0.4 -> 0 in 0.8 s; #13 ready 0.3 -> 0 in 0.5 s
     do
       i = 1
       while i <= 6 do
         local pt = U.At(w.squad, i)
         pt.fx = ringFx(pt, 40, C().gold, 0.6, 1.25, 0.6)
-        pt.quietIn = K().FadeIn(pt, 0.25) -- New Tide C4: an auto-bought new portrait only fades in (no pop, no ring)
+        pt.quietIn = K().FadeIn(pt, 0.25)
         i = i + 1
       end
     end
@@ -1705,23 +1553,19 @@ do
         i = i + 1
       end
     end
-    -- boss ring (one-glow priority 1) and the auto-fight countdown ring (S5).
-    -- r3 G1: both belong to the boss button (own child frame one level above it), so hiding the button takes them along
     w.bossFx = CreateFrame("Frame", "MrglSquadBossFx", w.boss)
     w.bossFx:SetAllPoints(w.boss)
     w.bossFx:SetFrameLevel(w.boss:GetFrameLevel() + 1)
     w.bossRing = K().Glow(w.bossFx, "ring", 56, C().good, "OVERLAY", 1)
     w.bossRing:SetPoint("CENTER", w.boss, "CENTER", 0, 0)
     w.bossRing:Hide()
-    -- j1 #7: fades in once to 0.45 in 0.6 s and stays; no scale, no loop
     J.bossRing = w.bossRing:CreateAnimationGroup()
     K().AddAlpha(J.bossRing, 0, 0.45, 0.6, 0, 1, "OUT")
     w.bossCdRing = K().Glow(w.bossFx, "ring", 52, C().good, "OVERLAY", 2)
     w.bossCdRing:SetPoint("CENTER", w.boss, "CENTER", 0, 0)
     w.bossCdRing:Hide()
     J.cdRing = w.bossCdRing:CreateAnimationGroup()
-    J.cdRingScale = K().AddScale(J.cdRing, 1.06, 1, 2, 0, 1) -- j1 #8
-    -- r3 F2: boss silhouette during the victory (desaturated). j1 #25: alpha 0.2 -> 0 in 0.9 s, no scale
+    J.cdRingScale = K().AddScale(J.cdRing, 1.06, 1, 2, 0, 1)
     J.sil = w.fx:CreateTexture(nil, "ARTWORK", nil, -1)
     J.sil:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     J.sil:SetSize(84, 84)
@@ -1737,7 +1581,6 @@ do
     J.silAnim:SetScript("OnStop", function()
       J.sil:Hide()
     end)
-    -- x2 over a portrait (numbers layer)
     J.msWrap = CreateFrame("Frame", "MrglSquadX2", w.numbers)
     M().SetLevel(J.msWrap, M().LEVEL.numbers)
     J.msWrap:SetSize(30, 16)
@@ -1746,10 +1589,9 @@ do
     mt:SetPoint("CENTER", J.msWrap, "CENTER", 0, 0)
     mt:SetText(S().TIMES2)
     J.msAnim = J.msWrap:CreateAnimationGroup()
-    K().AddMove(J.msAnim, 0, 8, 0.8, 0, 1, "OUT") -- j1 #17
+    K().AddMove(J.msAnim, 0, 8, 0.8, 0, 1, "OUT")
     K().AddAlpha(J.msAnim, 1, 1, 0.5, 0, 1)
     K().AddAlpha(J.msAnim, 1, 0, 0.3, 0.5, 1)
-    -- headline (+10): name row TOP 0,-28, 220 x 20
     hf = CreateFrame("Frame", "MrglSquadHeadlineRow", w.headLayer)
     M().SetLevel(hf, M().LEVEL.headline)
     hf:SetSize(HL_W, 20)
@@ -1758,7 +1600,6 @@ do
     hfs = K().Text(hf, K().FRIZ, 16, C().gold, "OUTLINE")
     hfs:SetPoint("CENTER", hf, "CENTER", 0, 0)
     hfs:SetJustifyH("CENTER")
-    -- F2 reward, shares the headline fades. j1b G1: in the row right of the title (bn.layout), FRIZ 18 OUTLINE gold
     hreward = K().Text(hf, K().FRIZ, 18, C().gold, "OUTLINE")
     hreward:SetPoint("LEFT", hf, "LEFT", 0, 0)
     hreward:SetJustifyH("LEFT")
@@ -1768,14 +1609,13 @@ do
     hic.tex:Hide()
     hic.fade = K().FadeIn(hic.tex, 0.4)
     hIn = hf:CreateAnimationGroup()
-    K().AddAlpha(hIn, 0, 1, 0.2, 0, 1, "OUT") -- j1 #21: only alpha
+    K().AddAlpha(hIn, 0, 1, 0.2, 0, 1, "OUT")
     hIn:SetToFinalAlpha(true)
     hOut = hf:CreateAnimationGroup()
     K().AddAlpha(hOut, 1, 0, HL_OUT, 0, 1)
     hOut:SetToFinalAlpha(true)
-    bn.build(f) -- j1 G
-    td.build(f) -- New Tide F
-    -- enemy groups. j1 #1: punch 1 -> 0.97 (crit 0.95) in 0.06 s and back in 0.10 s, no shift; #2: no shake any more
+    bn.build(f)
+    td.build(f)
     local e = w.enemy
     J.punch = e:CreateAnimationGroup()
     J.punchScale1 = K().AddScale(J.punch, 1, 0.97, 0.06, 0, 1, "OUT")
@@ -1786,7 +1626,6 @@ do
     J.punch:SetScript("OnStop", function()
       w.enemyBack:Hide()
     end)
-    -- j1 #4 die: 1 -> 1.05, alpha 1 -> 0, 0.12 s; #5 spawn: 0.95 -> 1, alpha 0 -> 1, 0.12 s
     J.die = e:CreateAnimationGroup()
     K().AddScale(J.die, 1, 1.05, 0.12, 0, 1, "OUT")
     K().AddAlpha(J.die, 1, 0, 0.12, 0, 1, "OUT")
@@ -1795,7 +1634,6 @@ do
     K().AddScale(J.spawn, 0.95, 1, 0.12, 0, 1, "OUT")
     K().AddAlpha(J.spawn, 0, 1, 0.12, 0, 1, "OUT")
     J.spawn:SetToFinalAlpha(true)
-    -- onboarding ring behind the first enemy. j1 #9: fades in once to 0.5 in 0.6 s and stays
     J.onboard = w.onboardRing:CreateAnimationGroup()
     K().AddAlpha(J.onboard, 0, 0.5, 0.6, 0, 1, "OUT")
     w.fx:SetScript("OnUpdate", function(self, dt)
@@ -1803,46 +1641,39 @@ do
     end)
     J.Register()
   end
-  -- ------------------------------------------------------------ effects
   function flash(a)
     if not J.FxOn("flash") then
       return
-    end -- j1 B: /mrgl debug fx flash off
+    end
     local v = a
     if calm() then
       v = a / 2
-    end -- L5: flash alpha halved
+    end
     J.flashA:SetFromAlpha(v)
     K().Replay(J.flash)
   end
-  -- r4 J1: a punch only hits a living enemy: not locked (dying), no spawn running, no respawn pause.
-  -- A click in the pause only shows its number (ManualClick).
   function canPunch()
     if Mrgl.db.boss.active and Core().rt.inCombat then
       return false
-    end -- j2 A2: frozen boss, the click deals nothing
+    end
     return not M().st.enemyLocked and not J.die:IsPlaying() and not J.spawn:IsPlaying() and Core().rt.respawn <= 0
   end
   J.CanPunch = canPunch
   function punch()
-    K().Replay(J.punch) -- OnStop of the replay hides the back first, so show it after
+    K().Replay(J.punch)
     W().enemyBack:Show()
   end
   J.Punch = function()
-    if not visible() or not ff.punchOk() then -- j4 H2 (b)
+    if not visible() or not ff.punchOk() then
       return
     end
     if not calm() then
-      -- j1 A3: calm mode has no punch
       K().ScaleTo(J.punchScale1, 0.97, 0.97)
       K().ScaleFrom(J.punchScale2, 0.97, 0.97)
       punch()
     end
     flash(0.10)
   end
-  -- L2: a click stored during the respawn pause shows its number at once (lane R)
-  -- j5 K1+: every own click in the pause shows (also in the boss pause, and when the queue of CLICK_QUEUE is full: then
-  -- the number only shows the click, it is not queued)
   J.ManualClick = function()
     if not visible() then
       return
@@ -1860,8 +1691,6 @@ do
       shownQueued = shownQueued + 1
     end
   end
-  -- j1 A1 #6: the one spark burst of the gold moment (J.Bonus may call J.Burst). n <= 8 sparks around anchor (+x, +y),
-  -- 24 px out. j1 A3: none in calm mode; B: none with /mrgl debug fx sparks off
   function burst(n, c, anchor, x, y)
     if calm() or not J.FxOn("sparks") then
       return
@@ -1873,7 +1702,7 @@ do
     end
     for i = 1, k do
       local s = U.At(sparks, sparkNext)
-      sparkNext = sparkNext % U.Len(sparks) + 1 -- nonneg
+      sparkNext = sparkNext % U.Len(sparks) + 1
       local ang = i / k * 2 * math.pi + math.random() * 0.4
       s:ClearAllPoints()
       s:SetPoint("CENTER", a, "CENTER", x or 0, y or 0)
@@ -1883,8 +1712,6 @@ do
     end
   end
   J.Burst = burst
-  -- r3 L10: kills queue coins; at most COIN_MAX fly at once, the rest wait (updateCoins, per frame)
-  -- tide1d D3: in fast mode at most one coin at a time: a new one only when none flies or waits, nothing queues up
   function coinFlight(n, extra)
     local now = GetTime()
     if ff.check() then
@@ -1915,19 +1742,18 @@ do
   end
   J.CoinsFlying = function()
     return coinsFlying()
-  end -- tide1d D3 (tests)
+  end
   function updateCoins()
     if U.Len(coinQ) == 0 then
       return
     end
     if hcur ~= nil then
       return
-    end -- r5 C1: no coin flies while a headline runs
+    end
     local now = GetTime()
     local flying = coinsFlying()
     local cap = COIN_MAX
     if ff.check() then
-      -- tide1d D3: one coin; what waited from the slow phase is dropped
       cap = 1
       while U.Len(coinQ) > 1 do
         U.Remove(coinQ, U.Len(coinQ))
@@ -1940,11 +1766,10 @@ do
       end
       local use
       for i = 1, U.Len(coins) do
-        -- round robin: the next coin has another arc
-        local c = U.At(coins, (coinRR + i - 1) % U.Len(coins) + 1) -- nonneg
+        local c = U.At(coins, (coinRR + i - 1) % U.Len(coins) + 1)
         if not c.anim:IsPlaying() then
           use = c
-          coinRR = (coinRR + i) % U.Len(coins) -- nonneg
+          coinRR = (coinRR + i) % U.Len(coins)
           break
         end
       end
@@ -1957,17 +1782,13 @@ do
       flying = flying + 1
     end
   end
-  -- j1 A1 #20: the gold icon does not pop on arrival any more (the coin fades into it)
-  -- L6/L11: 5 whelps, 0.12 s apart, at fixed heights in the icon; r4 L12: from x 12 to the right icon edge
   local WHELP_Y = { -16, -6, 4, 12, 20 }
-  -- j1c M5: every whelp stops, the layer is opaque again (end of the win fade, OnShow)
   J.WhelpsStop = function()
     for i = 1, U.Len(whelps) do
       U.At(whelps, i).anim:Stop()
     end
     J.whelpFx:SetAlpha(1)
   end
-  -- j1c M5: a boss win fades the whelps still in flight (0.2 s, alpha only)
   J.WhelpsOut = function()
     local any = false
     for i = 1, U.Len(whelps) do
@@ -1985,7 +1806,7 @@ do
     end
     if J.whelpOut:IsPlaying() then
       J.whelpOut:Stop()
-    end -- j1c M5: a new cast during the win fade starts clean
+    end
     local geo = M().GEO
     for i = 1, 5 do
       local t = U.At(whelps, i)
@@ -2003,7 +1824,6 @@ do
   J.CountdownRing = function(left)
     local r = W().bossCdRing
     if left > 0 and visible() and W().boss:IsShown() then
-      -- j1 #8: 1.06 -> 1 over the full delay, alpha 0.6
       K().ScaleFrom(J.cdRingScale, 1 + 0.06 * left / Mrgl.Data.Balance.AUTO_FIGHT_DELAY, 1 + 0.06 * left / Mrgl.Data.Balance.AUTO_FIGHT_DELAY)
       J.cdRingScale:SetDuration(left)
       r:SetAlpha(0.6)
@@ -2017,7 +1837,6 @@ do
       r:Hide()
     end
   end
-  -- r3 G1: no ring may outlive the boss button (boss start by auto, click, key Q or opener; win; fail; button hidden)
   J.BossRingsOff = function()
     local w = W()
     if J.cdRing:IsPlaying() then
@@ -2038,7 +1857,6 @@ do
     local w = W()
     return w.bossCdRing:IsShown() or w.bossRing:IsShown() or glowOwner == "boss"
   end
-  -- B5: "+n%" under the readiness bar when the squad grew since the last open or purchase
   local strBase = -1
   J.StrengthCheck = function()
     local cur = Core().Boss.Strength()
@@ -2049,11 +1867,10 @@ do
     end
     local d = (math.min(1, cur) - base) * 100
     if d >= 0.5 then
-      M().GainText(W().bossGrow, d) -- r3 P1
+      M().GainText(W().bossGrow, d)
       K().Replay(W().bossGrowAnim)
     end
   end
-  -- chain juice (E1): one pop per rank
   local chainSlots = {}; local chainMs = {}
   function chainReset()
     chainSlots = {}
@@ -2068,7 +1885,6 @@ do
       K().Replay(pt.fx.anim)
     end
   end
-  -- New Tide C4: an auto-bought murloc: no hop, no pop, no ring; a new portrait only fades in (0 -> 1 in 0.25 s)
   function quietIn(slot, first)
     if first then
       K().Replay(U.At(W().squad, slot).quietIn)
@@ -2084,14 +1900,11 @@ do
       Mrgl.UI.Panel.FlashMurloc(slot)
     end
   end
-  -- ------------------------------------------------------------ core events
   J.Register = function()
     local On = Core().On
-    -- j1 W2: in-world gold (Core.World) also while the window is hidden: the moment waits (J.Bonus)
     On("WORLD_BONUS", function(p)
       J.Bonus(p.kind, p.gold, p.n)
     end)
-    -- New Tide: TIDE from T.Rise (marks and lines), TROPHY after BOSS_WIN (the line queues behind the victory)
     On("TIDE", function(p)
       td.onTide(p)
     end)
@@ -2099,7 +1912,6 @@ do
       td.onTrophy(p)
     end)
     On("HIT", function(p)
-      -- New Tide C4: auto clicks have no number, punch or flash of their own; the core adds them to the squad number
       if p.kind == "auto" or not visible() then
         return
       end
@@ -2108,12 +1920,10 @@ do
         if td.autoMrgl then
           td.autoMrgl = false
           return
-        end -- C4: an auto-cast does not flash
-        flash(0.15) -- j1 #3; #2: no shake
+        end
+        flash(0.15)
         return
       end
-      -- tide1d D1: every whelp hit (tick bundle or queued single, crit or not, rush or not) goes silently to lane L:
-      -- never a flash or a punch
       if p.kind == "whelp" then
         whelpSum = whelpSum + p.amount
         return
@@ -2122,13 +1932,12 @@ do
         if p.kind == "click" and skipHits > 0 then
           skipHits = skipHits - 1
         end
-        number("R", p.amount, p.kind == "click", true) -- j5 K5 (c), j5b P4: a crit is never on the face centre (side lane R)
-        if not visible() or not ff.punchOk() then -- j4 H2 (b): not the killing hit, <= 1 per 0.6 s, none in fast mode
+        number("R", p.amount, p.kind == "click", true)
+        if not visible() or not ff.punchOk() then
           return
         end
-        flash(0.15) -- j1 #3
+        flash(0.15)
         if not calm() then
-          -- j1 #1 crit punch 0.95; A3: none in calm mode
           K().ScaleTo(J.punchScale1, 0.95, 0.95)
           K().ScaleFrom(J.punchScale2, 0.95, 0.95)
           punch()
@@ -2138,11 +1947,11 @@ do
       if p.kind == "click" and skipHits > 0 then
         skipHits = skipHits - 1
         return
-      end -- shown when it was queued
+      end
       number("R", p.amount, p.kind == "click")
     end)
     On("KILL", function(p)
-      ff.kill(p.boss, p.click) -- tide1c C1: counted while hidden too (j4 H2: a boss is no lifetime)
+      ff.kill(p.boss, p.click)
       if not visible() then
         return
       end
@@ -2151,9 +1960,7 @@ do
       if J.punch:IsPlaying() then
         J.punch:Stop()
       end
-      w.enemyBack:Hide() -- r4 J1
-      -- tide1c C1: fast farming: the face stays at full alpha until the next one swaps in (no die fade; bosses and rares
-      -- too, the victory line still comes)
+      w.enemyBack:Hide()
       if ff.swap then
         if J.die:IsPlaying() then
           J.die:Stop()
@@ -2162,8 +1969,6 @@ do
       else
         K().Replay(J.die)
       end
-      -- j1 #29: 1 coin per kill, a click kill 1 more; #6: no kill sparks; #19: no pip pop (the pip only fills).
-      -- A3 calm: no coins for normal kills
       local extra = 0
       if p.boss then
         bossPause = true
@@ -2175,13 +1980,13 @@ do
         coinFlight(1, extra)
       end
       if p.rare then
-        J.Bonus("rare", p.gold, 1) -- j1 G: rare kill = gold moment; boss: BOSS_WIN
+        J.Bonus("rare", p.gold, 1)
       end
     end)
     On("SPAWN", function()
-      ff.spawn() -- j4 H2 (a): the lifetime starts
+      ff.spawn()
       bossPause = false
-      W().enemyBack:Hide() -- r4 J1
+      W().enemyBack:Hide()
       if not visible() then
         shownQueued = 0
         return
@@ -2193,7 +1998,7 @@ do
       if J.die:IsPlaying() then
         J.die:Stop()
       end
-      if ff.swap then -- tide1c C1: swap only
+      if ff.swap then
         if J.spawn:IsPlaying() then
           J.spawn:Stop()
         end
@@ -2206,7 +2011,7 @@ do
       if not visible() then
         return
       end
-      J.Headline("rare", S().RARE_HEAD) -- j1 #6: no sparks at the rare spawn
+      J.Headline("rare", S().RARE_HEAD)
     end)
     On("STAGE", function(p)
       if not visible() then
@@ -2222,15 +2027,15 @@ do
     On("ZONE", function(p)
       if not visible() or td.rising then
         return
-      end -- New Tide F: the reset's zone change has no headline (tint at once)
-      M().st.zoneDefer = true -- the tint changes with the zone headline (after the victory)
-      if J.Headline("zone", p.name) == nil then -- tide1c C8: dropped, the tint changes at once
+      end
+      M().st.zoneDefer = true
+      if J.Headline("zone", p.name) == nil then
         M().st.zoneDefer = false
         M().SetZone(false)
       end
     end)
     On("BOSS_START", function(p)
-      J.BossRingsOff() -- G1: also while the window is hidden
+      J.BossRingsOff()
       if not visible() then
         return
       end
@@ -2243,13 +2048,12 @@ do
       M().Refresh()
       if not ff.check() then
         K().Replay(J.spawn)
-      end -- tide1c C1: fast farming, the boss swaps in
+      end
       w.timer:Show()
       w.timerText:Show()
       w.timer:SetAlpha(1)
       K().Replay(w.timerFill)
     end)
-    -- j1 #15: the last 5 s of the boss timer have no pulse and no pop, only the colour (Main.Refresh)
     On("BOSS_WIN", function(p)
       J.BossRingsOff()
       if not visible() then
@@ -2260,13 +2064,13 @@ do
         J.Bonus("boss", p.gold, 0, { name = p.name })
         ff.bossT = GetTime()
         return
-      end -- j1 W2: minimized, head only
-      fadeAllNumbers(0.1) -- j1 #6: no win sparks here (the gold moment owns the one burst)
-      J.WhelpsOut() -- j1c M5: whelps still in flight fade out (0.2 s)
-      M().st.bossHide = true -- the boss button stays away during the victory headline
-      J.silIcon = W().enemyIcon.mrglIcon -- r3 F2: the silhouette starts with the victory headline (shot 37)
-      J.Bonus("boss", p.gold, 0, { name = p.name }) -- j1 G: "{boss} defeated!", +gold, sparks
-      ff.bossT = GetTime() -- j4 H2 (d): after the victory line: the next 3 s count as fast mode
+      end
+      fadeAllNumbers(0.1)
+      J.WhelpsOut()
+      M().st.bossHide = true
+      J.silIcon = W().enemyIcon.mrglIcon
+      J.Bonus("boss", p.gold, 0, { name = p.name })
+      ff.bossT = GetTime()
     end)
     On("BOSS_FAIL", function()
       J.BossRingsOff()
@@ -2275,7 +2079,7 @@ do
       end
       local w = W()
       K().Replay(w.timerFade)
-      M().st.bossHide = true -- then the yellow border and bar come back (L3)
+      M().st.bossHide = true
       J.Headline("retreat", S().RETREAT)
     end)
     On("BUY", function(p)
@@ -2297,7 +2101,7 @@ do
         quietIn(p.slot, p.first)
         M().Refresh()
         return
-      end -- New Tide C4: auto-buy, quiet
+      end
       popPortrait(p.slot, p.first)
       J.StrengthCheck()
       M().Refresh()
@@ -2353,7 +2157,7 @@ do
       end
       if lastMs > 0 then
         milestoneFx(lastMs)
-      end -- C4: the milestone "x2" stays for auto-buys too
+      end
       if p.n > 0 and p.auto ~= true then
         K().Replay(W().buyPop)
       end
@@ -2367,8 +2171,6 @@ do
       end
       local w = W()
       local b = U.At(w.ab, p.slot)
-      -- New Tide C4: an auto-cast (War Drums) keeps its swipe and buff edge, but no punch, cheer, flash or headline
-      -- (LEEROY keeps its headline: it is the boss moment)
       local auto = p.auto == true
       if not auto then
         K().Replay(b.punch)
@@ -2377,7 +2179,6 @@ do
         td.autoMrgl = true
       end
       if p.id == "mrgl" then
-        -- j1 #32: the cheer runs one after another from the left, 0.1 s apart (A3: none in calm mode)
         if not calm() and not auto then
           local k = 0
           for i = 1, 6 do
@@ -2414,7 +2215,7 @@ do
       local b = U.At(W().ab, p.slot)
       if J.FxOn("unlock") then
         K().Replay(b.flash.anim)
-      end -- j1 B: /mrgl debug fx unlock off
+      end
       M().Refresh()
     end)
     On("ABILITY_READY", function(p)
@@ -2422,7 +2223,7 @@ do
         return
       end
       local b = U.At(W().ab, p.slot)
-      K().Replay(b.readyFlash.anim) -- W6: own ready flash, glow 56 ADD (j1 #13: 0.3 -> 0 in 0.5 s)
+      K().Replay(b.readyFlash.anim)
       M().Refresh()
     end)
     On("GATE_OPEN", function()
@@ -2437,8 +2238,6 @@ do
         return
       end
       J.OnShow()
-      -- S3: back after a long background without a popup: the same +X at the gold as after combat.
-      -- r4 K1: a return is any catch-up from LONG_FRAME (5 s) on (driver: OnUpdate elapsed >= 5 s); shown at once
       if p.seconds >= J.LONG_FRAME and p.gold > 0 and not Core().rt.popup then
         J.GoldPlus(p.gold, true)
       end
@@ -2450,7 +2249,6 @@ do
     if icon == nil or not J.FxOn("sil") then
       return
     end
-    -- j1 B4: a texture that does not load is never shown (SetTexture returns false in WoW)
     if J.sil:SetTexture(K().IconPath(icon)) == false then
       J.sil:Hide()
       return
@@ -2459,11 +2257,10 @@ do
     J.sil:Show()
     K().Replay(J.silAnim)
   end
-  J.LONG_FRAME = 5 -- r4 K1: an OnUpdate elapsed from this on counts as a return (CATCHUP), see main.js
+  J.LONG_FRAME = 5
   J.GoldPlus = function(gold, instant)
     M().GoldPlus(gold, instant)
   end
-  -- ------------------------------------------------------------ one-glow rule (plan 3.6, r2 B4, S4, E1, L6)
   J.GlowOwner = function()
     return glowOwner
   end
@@ -2484,14 +2281,14 @@ do
     end
     if Core().Boss.AutoState().state == "countdown" then
       return false
-    end -- the countdown ring shows instead
+    end
     if st == "greenAbil" then
       return true
     end
     if st == "green" and not db.settings.autofight then
       return true
     end
-    return db.stats.bosses == 0 and db.boss.lostStage == 0 -- S4: the first gate of the game
+    return db.stats.bosses == 0 and db.boss.lostStage == 0
   end
   function newAbility(maxAge)
     local db = Mrgl.db
@@ -2505,7 +2302,6 @@ do
     end
     return nil
   end
-  -- r3 G2: the ring has the readiness colour of the border (grey -> gold, yellow -> warn, green -> good)
   function bossRingColor()
     local st = M().st.bossState
     local c = C().gold
@@ -2536,7 +2332,6 @@ do
     if want == "boss" then
       bossRingColor()
     end
-    -- j1 #10: a new Buy best target fades the glow in once more (then it stands still again)
     local bk = buyKey()
     if want == "buy" and glowOwner == "buy" and bk ~= lastBuyKey then
       K().Replay(w.buyGlow)
@@ -2562,10 +2357,10 @@ do
     glowOwner = want
     if want == "onboard" then
       w.onboardRing:Show()
-      w.onboardRing:SetAlpha(0.5) -- j1 #9
+      w.onboardRing:SetAlpha(0.5)
       J.onboard:Play()
     elseif want == "boss" then
-      w.bossRing:SetAlpha(0.45) -- j1 #7
+      w.bossRing:SetAlpha(0.45)
       w.bossRing:Show()
       J.bossRing:Play()
     elseif want == "buy" then
@@ -2579,7 +2374,6 @@ do
       Mrgl.UI.Panel.Refresh()
     end
   end
-  -- ------------------------------------------------------------ per frame (fx frame: runs only while visible)
   J.OnUpdate = function(dt)
     updateNumbers(dt)
     updateHeadline(dt)
@@ -2593,7 +2387,7 @@ do
       local dealt = Core().Combat.TakeSquadDealt()
       if dealt > 0 and not calm() then
         number("L", dealt)
-      end -- L5: no lane L in calm mode
+      end
     end
     whelpT = whelpT + dt
     if whelpT >= 0.5 then
@@ -2604,10 +2398,9 @@ do
       whelpSum = 0
     end
   end
-  -- Drops every running effect (window shown again, catch-up, new db). No stored animation runs on.
   J.OnShow = function()
     local i; local n
-    J.TideAbort() -- New Tide F: a running moment ends (the reset is done)
+    J.TideAbort()
     do
       n = 1
       while n <= 4 do
@@ -2643,7 +2436,7 @@ do
         i = i + 1
       end
     end
-    J.whelpOut:Stop() -- j1c M5
+    J.whelpOut:Stop()
     J.whelpFx:SetAlpha(1)
     coinQ = {  }
     J.silAnim:Stop()
@@ -2656,7 +2449,7 @@ do
     W().enemyBack:Hide()
     M().GoldPlusStop()
     W().enemy:SetAlpha(1)
-    M().st.dimA = 1 -- j1b G1: no dim left over
+    M().st.dimA = 1
     W().enemyIcon:SetAlpha(1)
     M().LockEnemy(false)
     bossPause = bossPause and Core().rt.respawn > 0
@@ -2669,15 +2462,13 @@ do
     Core().Combat.TakeSquadDealt()
   end
   J.ResetPools = function()
-    td.reset() -- New Tide F: before OnShow, so a new db is never reset by an old moment
+    td.reset()
     J.OnShow()
-    bn.reset() -- j1 W2: a new db drops the waiting moment (OnShow keeps it: closed -> next open)
+    bn.reset()
     bossPause = false
     strBase = Core().Boss.Strength()
     lastStage = Mrgl.db.stage
   end
-  -- ------------------------------------------------------------ j1 B: debug switches (sandbox: /mrgl debug fx|victory|zone)
-  -- Each effect group can be switched off alone to find the white area after a boss kill.
   J.FX = { "spot", "flash", "sparks", "sil", "zone", "unlock" }
   local fxOff = {}
   J.FxOn = function(name)
@@ -2708,7 +2499,6 @@ do
     end
     return true
   end
-  -- the full victory: opens the next boss gate if needed, starts the fight and wins it with one click (real core path)
   J.DebugVictory = function()
     local db = Mrgl.db
     local Cb = Core().Combat
@@ -2727,23 +2517,21 @@ do
     end
     db.enemyHp = 1
     Core().rt.respawn = 0
-    Core().rt.enemyAge = math.max(Core().rt.enemyAge, Mrgl.Data.Balance.MIN_LIFE) -- j5 K5: the debug win is at once
+    Core().rt.enemyAge = math.max(Core().rt.enemyAge, Mrgl.Data.Balance.MIN_LIFE)
     M().Hit(true)
     return true
   end
-  -- the zone tint crossfades to the next zone (1 s, as after a zone boss); the stage stays
   local dbgZone = 0
   J.DebugZoneNext = function()
     local B = Mrgl.Data.Balance
     if dbgZone == 0 then
       dbgZone = Core().Formula.ZoneIndex(Mrgl.db.stage)
     end
-    dbgZone = dbgZone % B.ZONES + 1 -- nonneg
+    dbgZone = dbgZone % B.ZONES + 1
     local stage = (dbgZone - 1) * B.STAGES_PER_ZONE + 1
     M().ZoneTint(Core().Combat.Zone(stage).tint, false)
     return dbgZone
   end
-  -- dev / test-ui: live numbers per lane, coins in flight, current headline
   J.Debug = function()
     local w = W()
     local wl = 0
@@ -2753,7 +2541,6 @@ do
       end
     end
     local out = { total = 0, lanes = { R = 0, L = 0, C = 0, A = 0 }, coins = coinsFlying(), coinsWaiting = U.Len(coinQ), headline = J.HeadlineText(), reward = J.RewardText(), silhouette = J.sil:IsShown(), back = w.enemyBack:IsVisible(), die = J.die:IsPlaying(), spawn = J.spawn:IsPlaying(), punch = J.punch:IsPlaying(), respawn = Core().rt.respawn > 0, whelps = wl, goldPlus = w.goldPlus:GetText(), goldPlusAlpha = w.goldPlus:GetAlpha() }
-    -- r4 J1 / L12 / K1: punch square, enemy groups, respawn pause, whelps in flight, "+X" at the gold
     for n = 1, 4 do
       local key = U.At(LANE_KEYS, n)
       local pool = LANES[key].list

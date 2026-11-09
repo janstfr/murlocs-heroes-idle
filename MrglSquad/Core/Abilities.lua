@@ -1,6 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/Abilities.lua equivalent: unlock, use, buffs, boss opener (plan 4.4).
--- Cooldowns run on readyAt = server time + CD, so they also run while offline.
 Mrgl.Core = Mrgl.Core or {}
 do
   local F, B, Cb, leeroyHit
@@ -35,8 +33,6 @@ do
     end
     return 0
   end
-  -- New Tide C2: ability values are read with the Spells factor (Balance stays unchanged). Keys: MRGL_DPS_SEC (Anyfin Can
-  -- Happen at Spells 50: TIDE_ANYFIN_SEC), LEEROY_DPS_SEC, LEEROY_CLICKS, WHELPS_CPS
   A.Power = function(key)
     local T = Mrgl.Core.Tide
     local v = B()[key]
@@ -45,11 +41,9 @@ do
     end
     return v * T.SpellMult()
   end
-  -- buff length of whelps, candle and the LEEROY crit rush (Spells 100: x2)
   A.BuffDur = function(id)
     return A.Def(id).dur * Mrgl.Core.Tide.BuffMult()
   end
-  -- look of a slot: Data.Abilities entry, or its alt (Anyfin Can Happen) once Spells 50 is reached
   A.Look = function(id)
     local d = A.Def(id)
     if d ~= nil and d.alt ~= nil and Mrgl.Core.Tide.Has("a", 50) then
@@ -95,7 +89,6 @@ do
       end
     end
   end
-  -- auto = true: cast by War Drums (Core/Tide C4); ABILITY_USE then carries auto = true
   A.Use = function(id, fromOpener, auto)
     local db = Mrgl.db
     if not A.IsReady(id) then
@@ -129,14 +122,12 @@ do
     elseif id == "candle" then
       db.buffs.candle = C.Now() + A.BuffDur(id)
     elseif id == "leeroy" then
-      -- r2 B3: headline first, the charge lands 0.3 s later, then 10 s of crit clicks
       C.rt.leeroyHit = b.LEEROY_DELAY
       C.rt.leeroyLine = b.LEEROY_HEADLINE
       db.buffs.leeroy = C.Now() + A.BuffDur(id)
     end
     return true
   end
-  -- Boss opener: ready abilities in the order Candle -> Whelps -> LEEROY -> MRGLGLGL, 0.15 s apart
   A.QueueOpener = function()
     local rt = C.rt
     rt.opener = {}
@@ -168,9 +159,8 @@ do
   A.Step = function(dt)
     local db = Mrgl.db
     local rt = C.rt
-    -- r2 B10: a boss fight frozen by WoW combat also freezes buffs and the opener (cooldowns run on)
     if rt.inCombat and db.boss.active then
-      for k, v in pairs(db.buffs) do   -- order does not matter (each buff on its own)
+      for k, v in pairs(db.buffs) do
         if v > 0 then
           db.buffs[k] = v + dt
         end
@@ -187,7 +177,6 @@ do
         leeroyHit()
       end
     end
-    -- opener queue
     if U.Len(rt.opener) > 0 then
       rt.openerT = rt.openerT - dt
       while U.Len(rt.opener) > 0 and rt.openerT <= 1e-9 do
@@ -198,20 +187,16 @@ do
         rt.openerT = rt.openerT + B().OPENER_GAP
       end
     end
-    -- Many Whelps!: 10 automatic clicks per second
     if db.buffs.whelps > 0 then
       if C.Now() < db.buffs.whelps then
         rt.whelpAcc = rt.whelpAcc + A.Power("WHELPS_CPS") * dt
         if rt.quiet == true then
-          -- tide1c C6: silent catch-up, one bundle per tick (Spells 100: ~600 whelp clicks per tick)
           local wn = math.floor(rt.whelpAcc + 1e-9)
           rt.whelpAcc = rt.whelpAcc - wn
           if wn > 0 then
             Cb().WhelpBurst(wn)
           end
         else
-          -- tide1d D1 online: one bundle per tick, one HIT (no crit flash, no punch); counted with the old loop so the
-          -- accumulator keeps exactly the old float steps
           local wl = 0
           while rt.whelpAcc >= 1 - 1e-9 do
             rt.whelpAcc = rt.whelpAcc - 1
@@ -234,7 +219,6 @@ do
       db.buffs.leeroy = 0
       C.Fire("BUFF_END", { id = "leeroy" })
     end
-    -- ready events (no glow: only the cooldown bling in the UI)
     local l = Mrgl.Data.Abilities
     for i = 1, U.Len(l) do
       local d = U.At(l, i)

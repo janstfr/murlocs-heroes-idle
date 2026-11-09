@@ -1,7 +1,5 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - all game-facing English strings (plan 3.7, 4.5). {x} = placeholder, filled by Mrgl.U.Fill.
 Mrgl.Data = Mrgl.Data or {}
-
 Mrgl.Data.Strings = {
   TITLE = "Murlocs Heroes Idle",
   BINDING_HEADER = "Murlocs Heroes Idle",
@@ -11,8 +9,6 @@ Mrgl.Data.Strings = {
   BIND_BOSS = "Fight boss",
   BIND_PANEL = "Toggle shop",
   BIND_TOGGLE = "Toggle window",
-
-  -- head
   STAGE_TITLE = "Stage {s}",
   STAGE_KILLS = "Kills: {k}/10",
   STAGE_GATE = "Boss ready: {boss}",
@@ -20,22 +16,18 @@ Mrgl.Data.Strings = {
   BOSS_MARK = "Boss",
   GOLD_TITLE = "Gold",
   GOLD_RATE = "Squad earns about {rate} per second.",
-
-  -- enemy
   ENEMY_LEVEL = "Level {lvl}",
   ENEMY_LEVEL_BOSS = "Level {lvl} Boss",
   ENEMY_LEVEL_RARE = "Level {lvl} Rare",
-  ENEMY_LEVEL_ELITE = "Level {lvl} Elite", -- enemies1 G3: normals 5 and 6 of a zone
-  STAGE_RARES = "Rares: {n}/{max}", -- enemies1b F5: stage tooltip, grey, the rares seen over the zones reached so far
-  STAGE_RARE = "Rare: {name}", -- enemies1 G8: stage tooltip, white once seen, muted before
+  ENEMY_LEVEL_ELITE = "Level {lvl} Elite",
+  STAGE_RARES = "Rares: {n}/{max}",
+  STAGE_RARE = "Rare: {name}",
   ENEMY_HEALTH = "Health: {hp} / {max}",
   ENEMY_GOLD = "Gold: {gold}",
   ENEMY_GOLD_RARE = "Gold: {gold} (×{m})",
-  SAVECHECK = "Murlocs Heroes Idle: loaded {from} copy, saveSeq {seq}.",   -- r4 W21
+  SAVECHECK = "Murlocs Heroes Idle: loaded {from} copy, saveSeq {seq}.",
   ENEMY_CLICK_GOLD = "Your own clicks loot 2.5× gold.",
   ENEMY_CLICK = "Click to attack.",
-
-  -- boss button
   BOSS_TEASER = "Waits at stage {s}.",
   BOSS_GREY = "Fight now? Your squad is not ready.",
   BOSS_YELLOW = "Close fight. Clicks and abilities can win it.",
@@ -45,7 +37,7 @@ Mrgl.Data.Strings = {
   BOSS_HELD = "Lost last time. Waits for a stronger squad.",
   BOSS_LOST_AT = "Lost last time at {hp} health.",
   BOSS_STRENGTH = "Squad strength: {pct} of a sure win.",
-  BOSS_NEXT = "Next: {item} · {gain} strength.",   -- r4 E15
+  BOSS_NEXT = "Next: {item} · {gain} strength.",
   BOSS_NEXT_TO = "{name} to {m}",
   BOSS_STATS = "Health: {hp} · Time: {t} sec",
   BOSS_CLICK_LOSE = "Click to fight. Losing costs nothing.",
@@ -54,8 +46,6 @@ Mrgl.Data.Strings = {
   BOSS_CLICK = "Click to fight.",
   BOSS_OPENER = "Opens with your ready abilities.",
   BOSS_KEY = "Key: Q",
-
-  -- squad
   PORTRAIT_LINE = "{n} hired · {dps} damage per second",
   PORTRAIT_NONE = "Not hired yet.",
   PORTRAIT_COST = "First one costs {cost} gold.",
@@ -64,8 +54,6 @@ Mrgl.Data.Strings = {
   MURLOC_NEXT = "Next ×2 at {m} hired.",
   COST = "Cost: {cost}",
   MURLOC_CLICK = "Click to hire {amount}.",
-
-  -- upgrades
   UPG_OF = "{murloc} upgrade {tier}",
   UPG_DOUBLE = "Doubles {murloc} damage.",
   UPG_SUB_DOUBLE = "×2 DPS",
@@ -75,8 +63,6 @@ Mrgl.Data.Strings = {
   UPG_NEEDS_PREV = "Buy {upgrade} first.",
   UPG_OWNED = "Owned.",
   UPG_TIMES2 = "×2",
-
-  -- self
   SELF_NOW = "Now: {value}",
   SELF_NEXT = "Next: {next}",
   SELF_MAXED = "Maxed out.",
@@ -89,19 +75,15 @@ Mrgl.Data.Strings = {
   SELF_LOCKED_HIRE = "Unlocks with your first murloc.",
   SELF_LOCK_STAGE = "Stage {s}",
   SELF_LOCK_HIRE = "1st hire",
-
-  -- abilities
   ABILITY_CD = "Cooldown: {cd}",
   ABILITY_KEY = "Key: {key}",
   ABILITY_READY_IN = "Ready in {t}",
   ABILITY_ACTIVE = "Active: {t} left",
   ABILITY_LOCKED = "Unlocks at stage {s}.",
-
-  -- buy best
   BUYBEST = "Buy best",
   BUYBEST_GAIN = "{gain} damage for {cost} gold.",
   BUYBEST_NEW_GAIN = "New murloc · {gain} damage for {cost} gold.",
-  BUYBEST_MORE = "...and {m} more.", -- port p2: ASCII dots (U+2026 may be missing in FRIZQT__)
+  BUYBEST_MORE = "...and {m} more.",
   PART_OF_BEST = "Part of Buy best (×{k}).",
   PART_OF_BEST_1 = "Part of Buy best.",
   BUY_NEW = "New!",
@@ -109,8 +91,6 @@ Mrgl.Data.Strings = {
   BUYBEST_WAIT = "Affordable in {t}.",
   BUYBEST_KEY = "Key: B",
   BUYBEST_AMOUNT = "{name} ×{n}",
-
-  -- panel
   TAB_SQUAD = "Squad", TAB_SQUAD_TIP = "Hire murlocs. They fight for fish.",
   TAB_UPGRADES = "Upgrades", TAB_UPGRADES_TIP = "Make your murlocs stronger.",
   TAB_SELF = "Self", TAB_SELF_TIP = "Sharpen your own clicks.",
@@ -124,8 +104,6 @@ Mrgl.Data.Strings = {
   SETTINGS = "Settings",
   SHOW_SHOP = "Show shop", HIDE_SHOP = "Hide shop", SHOP_KEY = "Key: E",
   CLOSE = "Close", CLOSE_TIP = "Your squad keeps fighting.",
-
-  -- settings page (r2 S1)
   SET_CALM = "Calm mode",
   SET_CALM_TIP = "Fewer numbers and coins. Your squad stays still.",
   SET_OPENER = "Boss opener",
@@ -137,14 +115,10 @@ Mrgl.Data.Strings = {
   SET_ALLIANCE = "Alliance",
   SET_HORDE = "Horde",
   SET_FACTION_TIP = "Browser only. In WoW your character decides.",
-
-  -- popup
   WELCOME = "Welcome back",
   COLLECT = "Collect",
-  COLLECT_TIP = "Offline earnings: {pct}% for up to 8 hours.", -- New Tide S: pct = 50, or 75 with Murlocs 25
+  COLLECT_TIP = "Offline earnings: {pct}% for up to 8 hours.",
   OFFLINE_COUNTED = "{h}h counted",
-
-  -- banners
   RETREAT = "Retreat!",
   DEFEATED = "{boss} defeated!",
   RARE = "Rare!",
@@ -152,12 +126,10 @@ Mrgl.Data.Strings = {
   LEEROY_BANNER = "LEEEROY JENKINS!",
   PLUS = "+{v}",
   TIMES2 = "×2",
-  -- j1 U: upgrade tab, one row per murloc
   UPG_EFFECT_DOUBLE = "×2 damage",
   UPG_REQ = "{n}/{req} hired",
   UPG_HIRE_FIRST = "Hire first",
   UPG_COMPLETE = "Complete",
-  -- j1 G/W: the gold moment
   BONUS_RARE = "Rare kill!",
   BONUS_QUEST = "Quest complete!",
   BONUS_QUESTS = "{n} quests complete!",
@@ -166,21 +138,18 @@ Mrgl.Data.Strings = {
   BONUS_LEVEL_2 = "Mrgl mrgl! Shiny!",
   BONUS_LEVEL_3 = "Aaaaughibbrgubugbugrguburgle!",
   BONUS_ZONE = "New zone!",
-  VICTORY = "Victory!", -- j1c M3: the boss title when "{boss} defeated!" does not fit next to the amount
-  -- j1 M: minimize
+  VICTORY = "Victory!",
   MINIMIZE = "Minimize",
   RESTORE = "Restore",
-  -- j1 #12: minimap button (addon only)
   MINIMAP_GOLD = "Gold: {gold}",
   MINIMAP_CLICK = "Left: window · Right: minimize · Shift: settings",
   SET_MINIMAP = "Minimap button",
-  SET_HIDE_COMBAT = "Hide in combat", -- j2 A2
-  PAUSED_COMBAT = "Paused in combat", -- j2 A2: a boss fight frozen by WoW combat (window visible)
+  SET_HIDE_COMBAT = "Hide in combat",
+  PAUSED_COMBAT = "Paused in combat",
   MINIMAP_SHOWN = "Minimap button shown.",
   MINIMAP_HIDDEN = "Minimap button hidden. /mrgl minimap shows it again.",
   COMPARTMENT = "Murlocs Heroes Idle",
   COMPARTMENT_TIP = "Click to show or hide the window.",
-  -- New Tide (ngplus-plan S). TIDE_POP_NEW: several names joined with " · "; TIDE_POP_RANK uses "to" (tide1b T6: no arrow)
   TAB_TIDE = "New Tide",
   TAB_TIDE_TIP = "Start over stronger. Every New Tide adds 1 point to a path.",
   TIDE_FLOOD_X = "×{x}",
@@ -209,7 +178,7 @@ Mrgl.Data.Strings = {
   TIDE_PER_M = "+50% per point",
   TIDE_PER_S = "+100% per point",
   TIDE_PER_A = "+200% per point",
-  TIDE_PT_M = "+50%/pt", -- j5 K2: the short bonus under a path column at 0 points (the long one stays in the tooltip)
+  TIDE_PT_M = "+50%/pt",
   TIDE_PT_S = "+100%/pt",
   TIDE_PT_A = "+200%/pt",
   TIDE_RECOMMENDED = "Recommended first: it helps most while you are away.",
@@ -245,9 +214,9 @@ Mrgl.Data.Strings = {
   TIDE_COMING_TIP = "Coming later.",
   TIDE_BEST_TITLE = "Deepest stage",
   TIDE_BEST_TIP = "The deepest stage you reached in any tide: {s}.",
-  TIDE_MURKY_DPS = "Murky: {dps} per second", -- enemies1 N1: no flavour
-  TIDE_MURKY_FIGHTS = "Fights along: {dps} per second.", -- tide1d D4: Murky's companion tooltip
-  TIDE_SPELLS_BOSS = "Needs you at the boss until War Drums (10).", -- tide1d D4: Spells path below War Drums
+  TIDE_MURKY_DPS = "Murky: {dps} per second",
+  TIDE_MURKY_FIGHTS = "Fights along: {dps} per second.",
+  TIDE_SPELLS_BOSS = "Needs you at the boss until War Drums (10).",
   NEF_STAGE_TIP = "Defeat Nefarian for a trophy.",
   STAGE_TIDE = "New Tide {n}",
   STAGE_COMING = "Ahn'Qiraj and Naxxramas: coming later."

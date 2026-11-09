@@ -1,7 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Popup.lua equivalent: "Welcome back" popup (plan 3.5, r2 S2) and the settings page inside the
--- panel (r2 S1, replaces the popover of plan 3.4). The page lives here because of the browser-only faction switch (W7;
--- the switch itself is not ported, in WoW the character decides).
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, Tips, Panel, readinessColor, rowY, toggleRow, textButton, label, screenPos
@@ -26,18 +23,16 @@ do
   end
   local w = {}
   Po.w = w
-  -- New Tide Q: the tide popup's widgets and state (declared here: Po.IsOpen reads it)
-  local tp = { open = false, path = "m", picks = {}, keep = {}, reset = {}, inC = false, cover = "", lw = 0 } -- tide1b T6: inC = combat look shown
+  local tp = { open = false, path = "m", picks = {}, keep = {}, reset = {}, inC = false, cover = "", lw = 0 }
   Po.tp = tp
   local roll = { from = 0, to = 0, t = 1 }
-  local POP_H = 168; local POP_H_NOGATE = 140 -- r3 F3: without a gate (no boss icon) the popup is shorter
-  -- ------------------------------------------------------------ welcome back
+  local POP_H = 168; local POP_H_NOGATE = 140
   Po.BuildWelcome = function(main)
     local S = Mrgl.Data.Strings
     local dim = CreateFrame("Button", "MrglSquadDimmer", main)
     w.dim = dim
     dim:SetAllPoints(main)
-    dim:SetFrameLevel(main:GetFrameLevel() + 12) -- r2 L1: popup level +12
+    dim:SetFrameLevel(main:GetFrameLevel() + 12)
     K().Fill(dim, { 0, 0, 0, 0.55 }, "BACKGROUND")
     dim:SetScript("OnClick", function()
       Po.Collect()
@@ -48,7 +43,7 @@ do
     p:SetSize(200, POP_H)
     p:SetPoint("CENTER", main, "CENTER", 0, 0)
     p:EnableMouse(true)
-    Panel().Backdrop(p, C().panel) -- r2 R1
+    Panel().Backdrop(p, C().panel)
     w.popIn = p:CreateAnimationGroup()
     K().AddScale(w.popIn, 0.9, 1, 0.15, 0, 1, "OUT")
     K().AddAlpha(w.popIn, 0, 1, 0.15, 0, 1, "OUT")
@@ -61,7 +56,6 @@ do
     w.watch:SetPoint("TOP", p, "TOP", -30, -34)
     w.away = K().Text(p, K().ARIALN, 14, C().text, "")
     w.away:SetPoint("LEFT", w.watch, "RIGHT", 6, 0)
-    -- r2 S2: away longer than the offline cap -> "8h counted" below the time
     w.counted = K().Text(p, K().ARIALN, 10, C().muted, "")
     w.counted:SetPoint("TOPLEFT", w.away, "BOTTOMLEFT", 0, -1)
     w.amountRow = CreateFrame("Frame", nil, p)
@@ -73,7 +67,6 @@ do
     w.coin = K().Icon(w.amountRow, Mrgl.Data.Icons.coin, "ARTWORK")
     w.coin:SetSize(20, 20)
     w.coin:SetPoint("RIGHT", w.amount, "LEFT", -4, 0)
-    -- r2 S2 / K7: no ability row; with an open gate the next boss with its readiness border
     local bf = CreateFrame("Frame", "MrglSquadWelcomeBoss", p)
     w.boss = bf
     bf:SetSize(24, 24)
@@ -83,7 +76,7 @@ do
     bf.icon:SetPoint("TOPLEFT", bf, "TOPLEFT", 2, -2)
     bf.icon:SetPoint("BOTTOMRIGHT", bf, "BOTTOMRIGHT", -2, 2)
     bf.border = K().Border(bf, C().muted, "OVERLAY")
-    bf.border2 = K().Border(bf, C().muted, "OVERLAY", 1) -- 2 px status border (R3)
+    bf.border2 = K().Border(bf, C().muted, "OVERLAY", 1)
     K().Tip(bf, function(tt)
       Tips().BossButton(tt)
     end)
@@ -102,7 +95,6 @@ do
     b:SetScript("OnClick", function()
       Po.Collect()
     end)
-    -- New Tide S: COLLECT_TIP carries the offline rate ({pct} = 50, or 75 with Murlocs 25)
     K().Tip(b, function(tt)
       Tips().Title(tt, S.COLLECT)
       Tips().Line(tt, U.Fill(S.COLLECT_TIP, { pct = math.floor(Core().Tide.OfflineRate() * 100 + 0.5) }), C().tipText, true)
@@ -118,7 +110,6 @@ do
   function welcomeOpen()
     return w.dim ~= nil and w.dim:IsShown()
   end
-  -- New Tide Q: IsOpen covers both popups (bindings, Esc, debug); Collect only the welcome
   Po.IsOpen = function()
     return welcomeOpen() or tp.open
   end
@@ -137,12 +128,11 @@ do
     end
     return C().muted
   end
-  -- report = {seconds, gold}
   Po.ShowWelcome = function(report)
     local S = Mrgl.Data.Strings
     if Mrgl.UI.Main.IsMinimized() then
       Mrgl.UI.Main.SetMinimized(false)
-    end -- j1 M2: the popup needs the full window
+    end
     local cap = Mrgl.Data.Balance.OFFLINE_MAX
     w.away:SetText(U.Clock(report.seconds))
     if report.seconds > cap then
@@ -162,7 +152,6 @@ do
       w.boss:Show()
       w.popup:SetHeight(POP_H)
     else
-      -- r3 F3: title, time, amount and Collect fill 140 px with even margins (12 top, 10 bottom)
       w.boss:Hide()
       w.popup:SetHeight(POP_H_NOGATE)
     end
@@ -180,7 +169,6 @@ do
     Mrgl.UI.Main.st.goldHold = 0
     Mrgl.UI.Main.Refresh()
   end
-  -- a new db (UI.Reset): both popups close without effect
   Po.CloseAll = function()
     Po.TideCancel()
     if welcomeOpen() then
@@ -188,22 +176,6 @@ do
       Core().SetPopup(false)
     end
   end
-  -- ------------------------------------------------------------ New Tide popup (ngplus-plan Q): MrglSquadTide, 200 x 196
-  -- Built like "Welcome back": own background and edge, CENTER of MrglSquadFrame, on a dimmer (0,0,0,0.55) at level +12.
-  -- Only from tab 4 (full window; a minimized window is restored first). Open: rt.popup = true (auto-fight and gold
-  -- moments wait). Nothing is decided until New Tide is pressed: the path icons switch freely (alpha and edge only, at
-  -- once); the dimmer, Esc, Not yet, closing or hiding the window (OnHide reaches the popup) end it without effect.
-  -- WoW combat: "Hide in combat" on -> closes like Not yet; off -> stays, New Tide at 0.45 and not clickable,
-  -- "Not during combat." in the last line, both back when combat ends. Fades in by alpha only.
-  -- Deviation (measured): Keep + Reset with their 7 icons need ~194 px in one row (the popup is 200), and the plan's
-  -- "forever" line at y -166 lies under the buttons (top at -166). So Keep and Reset are two rows (y -144, -164; labels in
-  -- one column, icons aligned), the forever line is at y -186 and the popup is 232 high (TIDE_POP_H).
-  -- tide1c C4: a muted tag (ARIALN 10, 2 lines of 62 px: tag + tag2) under every path: the picks are 64 apart and everything
-  -- under them moves down 12 px (popup 244 high)
-  -- j5 K3 (Jan: "die ganze Fenstergröße nehmen, damit nicht alles so klein ist"): the popup covers the whole addon
-  -- window, the main frame plus the open panel (panel closed: the main frame), re-anchored when the panel opens or
-  -- closes while it is up (tideCover). Same content and order, larger: path icons 48 (was 32), every text one size up,
-  -- the content centred in the popup. The dimmer, Esc, Not yet, the double-click guard and the alpha-only fade stay.
   local TIDE_KEEP_Y, TIDE_RESET_Y, TIDE_FOREVER_Y = -200, -222, -248
   local TIDE_PICK_X, TIDE_PICK = { -76, 0, 76 }, 48
   local TIDE_KEEP = { { "", "TIDE_KEEP_POINTS" }, { "Ability_Warrior_BattleShout", "TIDE_KEEP_ABIL" }, { "INV_Misc_Gear_01", "TIDE_KEEP_SET" } }
@@ -252,18 +224,16 @@ do
     local p = CreateFrame("Frame", "MrglSquadTide", dim, "BackdropTemplate")
     tp.popup = p
     tp.main = main
-    p:Hide() -- shown only while open: WoW's Esc (CloseSpecialWindows) checks IsShown, not IsVisible
-    p:SetAllPoints(main) -- j5 K3: tideCover sets the real cover on open
+    p:Hide()
+    p:SetAllPoints(main)
     p:EnableMouse(true)
     Panel().Backdrop(p, C().panel)
     tp.popIn = p:CreateAnimationGroup()
     K().AddAlpha(tp.popIn, 0, 1, 0.15, 0, 1, "OUT")
-    -- Esc: WoW hides UISpecialFrames; the popup's OnHide (also when the window hides) cancels
     tinsert(UISpecialFrames, "MrglSquadTide")
     p:SetScript("OnHide", function()
       Po.TideCancel()
     end)
-    -- j5b P5: a small static X top right (the window's X is under the popup): exactly like Not yet; muted, white on hover
     local x = CreateFrame("Button", "MrglSquadTideClose", p)
     tp.x = x
     x:SetSize(14, 14)
@@ -307,11 +277,11 @@ do
       K().Tip(b, function(tt, self)
         Tips().TidePick(tt, self.index)
       end)
-      b.tag = K().Text(p, K().ARIALN, 11, C().muted, "") -- tide1c C4: Best while away / clicking / at bosses
+      b.tag = K().Text(p, K().ARIALN, 11, C().muted, "")
       b.tag:SetWidth(74)
       b.tag:SetPoint("TOP", b, "BOTTOM", 0, -2)
       b.tag:SetJustifyH("CENTER")
-      b.tag2 = K().Text(p, K().ARIALN, 11, C().muted, "") -- fontstrings never wrap (K.Text): the last word goes on line 2
+      b.tag2 = K().Text(p, K().ARIALN, 11, C().muted, "")
       b.tag2:SetWidth(74)
       b.tag2:SetPoint("TOP", b.tag, "BOTTOM", 0, 0)
       b.tag2:SetJustifyH("CENTER")
@@ -360,7 +330,6 @@ do
     no:SetScript("OnClick", function()
       Po.TideCancel()
     end)
-    -- "Hide in combat" on: the window goes, the popup closes like Not yet at once (the fade-out would end it 0.15 s later)
     Core().On("COMBAT", function(ev)
       if ev.on and tp.open and Mrgl.db.settings.hideCombat ~= false then
         Po.TideCancel()
@@ -370,8 +339,6 @@ do
       Po.TideRefresh()
     end)
   end
-  -- Keep: label + 3 icons, Reset: label + 4 icons; 16 x 16, 4 apart. The labels share one column (ARIALN 11 muted), the
-  -- icons start 6 px after the wider label, so both rows line up; j5 K3: the block is centred in the popup (from TOP)
   function tideRow(label, list, y, x0)
     label:ClearAllPoints()
     label:SetPoint("LEFT", tp.popup, "TOP", x0, y - 8)
@@ -387,7 +354,6 @@ do
     tideRow(tp.keepL, tp.keep, TIDE_KEEP_Y, x0)
     tideRow(tp.resetL, tp.reset, TIDE_RESET_Y, x0)
   end
-  -- j5 K3: the popup covers the main frame plus the open panel (whichever side it docks on), else the main frame
   function tideCover()
     local main, pf = tp.main, Mrgl.UI.Panel.Frame()
     local key = "main"
@@ -412,7 +378,6 @@ do
     else
       p:SetAllPoints(main)
     end
-    -- j5b P1: with the panel the three paths spread over the width (thirds of main + panel), else 76 apart
     local dx = 76
     if key ~= "main" then
       dx = math.floor((main:GetWidth() + pf:GetWidth() - 1) / 3)
@@ -423,7 +388,7 @@ do
       b:SetPoint("TOP", p, "TOP", (i - 2) * dx, -54)
     end
   end
-  Po.TideCover = function() -- tests
+  Po.TideCover = function()
     return tp.cover
   end
   function pathIndex(id)
@@ -435,7 +400,6 @@ do
     end
     return 0
   end
-  -- the popup's lines for the chosen path (Q table); called on open, on every pick and per frame (combat look)
   function tideFill()
     local S = Mrgl.Data.Strings
     local D = Mrgl.Data.Tide
@@ -480,7 +444,6 @@ do
     K().SetIcon(tp.go.icon, p.icon)
     local inC = Core().rt.inCombat == true
     tp.inC = inC
-    -- tide1b T6: disabled in combat, so the dimmed button shows no hover highlight either
     if inC then
       tp.go:SetAlpha(0.45)
       tp.go:Disable()
@@ -497,12 +460,12 @@ do
     end
     if Mrgl.UI.Main.IsMinimized() then
       Mrgl.UI.Main.SetMinimized(false)
-    end -- Q: the popup needs the full window
+    end
     local pr = Mrgl.db.prestige
     tp.path = pr.last
     if pr.count <= 0 or pathIndex(tp.path) <= 0 then
       tp.path = "m"
-    end -- Q: the first New Tide recommends Murlocs
+    end
     tp.open = true
     tp.cover = ""
     tideCover()
@@ -512,7 +475,7 @@ do
     tp.dim:Show()
     K().Replay(tp.popIn)
     Core().SetPopup(true)
-    Core().rt.tideVeil = true -- tide1c C7: no boss start while the popup or the moment is up
+    Core().rt.tideVeil = true
     return true
   end
   Po.TideIsOpen = function()
@@ -525,7 +488,6 @@ do
     tp.path = id
     tideFill()
   end
-  -- per frame while open: the combat look; New Tide no longer available -> close without effect
   Po.TideRefresh = function()
     if not tp.open then
       return
@@ -534,10 +496,10 @@ do
       Po.TideCancel()
       return
     end
-    tideCover() -- j5 K3: the panel opened or closed while the popup is up
+    tideCover()
     if (Core().rt.inCombat == true) ~= tp.inC then
       tideFill()
-    end -- tide1b T6: only when combat starts or ends
+    end
   end
   Po.TideCancel = function()
     if not tp.open then
@@ -551,8 +513,6 @@ do
     Core().rt.tideVeil = false
     Mrgl.UI.Main.Refresh()
   end
-  -- New Tide: the choice is final. rt.popup stays true until the reset at 0.3 s (Juice.TideMoment): nothing starts behind
-  -- the veil. In combat (hideCombat off) the button is not clickable.
   Po.TideGo = function()
     if not tp.open or not Core().Tide.Ready() then
       return false
@@ -564,12 +524,10 @@ do
     K().HideOwnTip()
     if Mrgl.UI.Panel.IsOpen() then
       Mrgl.UI.Panel.Show(false)
-    end -- tide1c C10: back to the single window
-    Mrgl.UI.Juice.TideMoment(path) -- keeps rt.tideVeil until the veil is gone
+    end
+    Mrgl.UI.Juice.TideMoment(path)
     return true
   end
-  -- ------------------------------------------------------------ settings page (r2 S1)
-  -- Rows 28 px from panel TOPLEFT 12,-40. Anchored to the panel, parented to the page.
   local ROW0 = -40; local ROWH = 28
   function rowY(k)
     return ROW0 - (k - 1) * ROWH
@@ -624,7 +582,6 @@ do
     l:SetText(text)
     return l
   end
-  -- panel = MrglSquadPanel, anchor = gear button (kept for the old signature)
   Po.BuildSettings = function(panel, anchor)
     local S = Mrgl.Data.Strings
     local B = Mrgl.Data.Balance
@@ -634,24 +591,19 @@ do
     f:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 36)
     f:SetFrameLevel(panel:GetFrameLevel() + 12)
     f:EnableMouse(true)
-    -- j1 P1: own opaque background in the panel colour (nothing of the list or behind the panel shows through)
     w.settingsBg = f:CreateTexture(nil, "BACKGROUND", nil, -8)
     w.settingsBg:SetAllPoints(f)
     K().SetColor(w.settingsBg, C().panel, 1)
-    -- Esc closes the settings page: WoW hides UISpecialFrames on Escape, OnHide returns to the list (r2 S1)
     tinsert(UISpecialFrames, "MrglSquadSettings")
     f:SetScript("OnHide", function()
       if Panel().IsSettingsOpen() then
         Panel().CloseSettings()
       end
     end)
-    -- r3 K3: no second tooltip border inside the panel. The page lies on the panel background (the list is hidden
-    -- while it is open); the `line` dividers under the tabs (y -30) and above the footer frame it.
     w.toggles = {  }
     local s = function()
       return Mrgl.db.settings
     end
-    -- j2 A2: row 1: hide the window in combat
     toggleRow(f, panel, 1, S.SET_HIDE_COMBAT, function()
       return s().hideCombat
     end, function(v)
@@ -687,7 +639,6 @@ do
     w.scalePlus:SetScript("OnClick", function(self)
       Po.SetScale(Mrgl.db.settings.scale + B.SCALE_STEP, self)
     end)
-    -- r3 S6: mouse wheel over the value, one step per notch
     w.scaleWheel = CreateFrame("Frame", "MrglSquadScaleWheel", f)
     w.scaleWheel:SetSize(40, 20)
     w.scaleWheel:SetPoint("CENTER", panel, "TOPLEFT", 192, rowY(5) - 8)
@@ -704,8 +655,6 @@ do
     rp:SetScript("OnClick", function()
       Mrgl.UI.Main.ResetPosition()
     end)
-    -- [browser] faction switch (in WoW the character decides): not ported
-    -- j1 #12: in that row the minimap button on/off (WoW only)
     toggleRow(f, panel, 7, S.SET_MINIMAP, function()
       return s().minimap
     end, function(v)
@@ -725,9 +674,8 @@ do
       t.fill:SetShown(t.get())
     end
     local sc = math.floor(Mrgl.db.settings.scale * 100 + 0.5)
-    w.scaleVal:SetText(U.Str(math.floor(sc / 100)) .. "." .. U.Pad2(sc % 100)) -- nonneg
+    w.scaleVal:SetText(U.Str(math.floor(sc / 100)) .. "." .. U.Pad2(sc % 100))
   end
-  -- Panel owns the open state (tabs, gear border); these only show or hide the page
   Po.ShowSettingsPage = function(on)
     if w.settings == nil then
       return
@@ -742,7 +690,6 @@ do
   Po.IsSettingsOpen = function()
     return Panel().IsSettingsOpen()
   end
-  -- old popover API, kept for main.js, Bindings (Esc) and dev: they now drive the panel page
   Po.ToggleSettings = function()
     Panel().ToggleSettings()
   end
@@ -754,8 +701,6 @@ do
       Panel().CloseSettings()
     end
   end
-  -- r3 S6: keep = the pressed control (+, - or the wheel field). Its screen position (GetLeft/GetTop x effective
-  -- scale) before and after SetScale; the difference goes onto the anchor of the main frame, so it stays under the cursor.
   function screenPos(r)
     local l = r:GetLeft()
     if l == nil then
@@ -767,7 +712,7 @@ do
   Po.SetScale = function(v, keep)
     if Mrgl.UI.Main.IsMoving() then
       return
-    end -- j1 #13: no scale change while the window is dragged
+    end
     local B = Mrgl.Data.Balance
     local s = math.floor(U.Clamp(v, B.SCALE_MIN, B.SCALE_MAX) * 100 + 0.5) / 100
     local main = Mrgl.UI.Main.w.frame
@@ -781,7 +726,7 @@ do
     Panel().Reanchor()
     if before ~= nil then
       local after = screenPos(keep)
-      local pt, _, rel, px, py = main:GetPoint(1)   -- WoW: point, relativeTo, relativePoint, x, y
+      local pt, _, rel, px, py = main:GetPoint(1)
       if after ~= nil and pt ~= nil then
         local me = main:GetEffectiveScale()
         local x = px + (before.x - after.x) / me
@@ -793,7 +738,7 @@ do
         st.point = pt
         st.rel = rel
         st.x = x
-        st.y = y -- our SavedVariables own the position (like SavePosition)
+        st.y = y
         Panel().Reanchor()
       end
     end

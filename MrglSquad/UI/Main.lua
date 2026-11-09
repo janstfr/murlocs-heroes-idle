@@ -1,8 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Main.lua equivalent: the compact window MrglSquadFrame (240 x 304, plan 3.2, r2 changes).
--- r2 L1: fixed frame levels relative to MrglSquadFrame, each its own frame:
---   +1 surface (zone tint, spotlight, onboarding ring)   +2 content (enemy, HP, timer, squad, bars, boss button)
---   +4 fx (flash, sparks, rings)   +6 numbers   +8 coins   +10 headline   +12 popup / settings (Popup.js)
 Mrgl.UI = Mrgl.UI or {}
 do
   local zoneTint
@@ -33,21 +29,14 @@ do
     return Mrgl.Data.Strings
   end
   M.LEVEL = { surface = 1, content = 2, fx = 4, numbers = 6, coins = 8, headline = 10, popup = 12 }
-  -- fixed geometry (window units from TOPLEFT, y down is negative); Juice uses it instead of GetCenter (W3)
-  -- r3 L10: coins end at the GoldIcon RIGHT (-1, 0) and turn under the head row (coinCtrl)
-  -- j1 M1 / j2 A3: minimize at TOPRIGHT -24 (the speaker button is gone), the gold icon is back at -46
   M.GEO = { w = 240, h = 304, enemyX = 120, enemyY = -94, enemyHalf = 44, goldIconX = 187.5, goldIconY = -13.5, goldIconHalf = 6.5, coinCtrlX = 182, coinCtrlY = -34, hMin = 26 }
-  local w = {} -- widgets
+  local w = {}
   M.w = w
-  local st = { goldShown = 0, goldFrom = 0, goldTo = 0, goldT = 1, goldHold = 0, lag = 1, lagDelay = 0, hpFrac = 1, enemyLocked = false, zone = 0, tintA = true, bossState = "", autoCd = false, t = 0, hopT = 0, unlockAt = {}, collectPulse = false, wasPopup = false, zoneDefer = false, bossHide = false, strBase = -1, pxScale = 0, hoverA = 0, nameA = 1, nameTarget = 1, saveTo = -1, saveFill = -1, saveMark = -1, bossAwayUntil = 0, plusT = -1, plusFresh = false, buyLow = false, min = false, dimA = 1, clickAt = -10, compHold = {}, anyfinHold = false, lookKey = "", lookT = -100, lookFast = false, lookBoss = false, lookIcon = "", xfade = 0 } -- New Tide F: held companions and Anyfin look; tide1d D2: held enemy look
+  local st = { goldShown = 0, goldFrom = 0, goldTo = 0, goldT = 1, goldHold = 0, lag = 1, lagDelay = 0, hpFrac = 1, enemyLocked = false, zone = 0, tintA = true, bossState = "", autoCd = false, t = 0, hopT = 0, unlockAt = {}, collectPulse = false, wasPopup = false, zoneDefer = false, bossHide = false, strBase = -1, pxScale = 0, hoverA = 0, nameA = 1, nameTarget = 1, saveTo = -1, saveFill = -1, saveMark = -1, bossAwayUntil = 0, plusT = -1, plusFresh = false, buyLow = false, min = false, dimA = 1, clickAt = -10, compHold = {}, anyfinHold = false, lookKey = "", lookT = -100, lookFast = false, lookBoss = false, lookIcon = "", xfade = 0 }
   local BOSS_AWAY = 3
-  -- j1b G1: the enemy icon fades to 0.35 while a gold moment stands (Juice.EnemyDim), in 0.2 s, back in 0.3 s; alpha only
-  -- j1c M4: an enemy clicked in the last clickT s only fades to aClick (it must not look dead while it is the target)
   M.DIM = { a = 0.35, aClick = 0.6, clickT = 1, inT = 0.2, outT = 0.3 }
-  -- r4 K1: "+X" at the gold: in 0.2 s, hold until 1.8 s, out until 2.2 s (was an animation group, see M.GoldPlus)
   local PLUS_IN = 0.2; local PLUS_HOLD = 1.8; local PLUS_END = 2.2
   M.st = st
-  -- tide1c C15: every layer sits one level higher than before, so the zone tint frames (main + 1) lie under the surface
   function lv(frame, n)
     frame:SetFrameLevel(w.frame:GetFrameLevel() + 1 + n)
   end
@@ -58,14 +47,7 @@ do
     lv(l, n)
     return l
   end
-  -- j1 #13: one drag for the window (main frame, head buttons, portraits, panel). While it moves nothing sets points on
-  -- main or the panel and nothing saves the position; DragStop saves, snaps (ApplyPosition) and reanchors once.
-  -- A missed OnDragStop (button released elsewhere, window hidden) is caught in OnUpdate / OnHide.
   local drag = { on = false, min = -1, dbgT = 0 }
-  -- j1b D1 (Jan #13, Persona S1): drag log. M.DragDebug = function(line) is the printer (Debug.lua /mrgl debug drag:
-  -- chat; browser MrglDev.dragDebug: console); nil = off. Lines at start, every 0.25 s while moving (OnUpdate),
-  -- stop (the raw position before the save) and snap (after ApplyPosition: a jump shows as a difference to stop).
-  -- grab = cursor minus the window's top-left in frame units: it stays constant while the window follows the mouse.
   M.DragDebug = nil
   local function dbgNum(v)
     if v == nil then
@@ -78,7 +60,7 @@ do
     local es = f:GetEffectiveScale()
     local pt = "none"
     if f:GetNumPoints() > 0 then
-      local p1, _, p3, px, py = f:GetPoint(1) -- point, relativeTo, relativePoint, x, y
+      local p1, _, p3, px, py = f:GetPoint(1)
       pt = p1 .. ">" .. p3 .. " " .. dbgNum(px) .. "," .. dbgNum(py)
     end
     local c1, c2 = GetCursorPosition()
@@ -118,7 +100,7 @@ do
     w.frame:StopMovingOrSizing()
     dragLog("stop")
     savePosition()
-    M.ApplyPosition() -- snap to the saved (whole-unit) position: saved = shown
+    M.ApplyPosition()
     if Mrgl.UI.Panel ~= nil then
       Mrgl.UI.Panel.Reanchor()
     end
@@ -126,7 +108,7 @@ do
     if drag.min >= 0 then
       local m = drag.min == 1
       drag.min = -1
-      M.SetMinimized(m) -- deferred minimize key
+      M.SetMinimized(m)
     end
   end
   M.Drag = function(frame)
@@ -138,10 +120,6 @@ do
       M.DragStop()
     end)
   end
-  -- j2 A1 (Jan j2 #1): the window is anchored at its BOTTOM (BOTTOMLEFT of UIParent BOTTOMLEFT). Minimized, the 26-px bar
-  -- sits on the former bottom edge; restoring grows the window upward. Any other point (TOPLEFT saves before j2, the point
-  -- a move leaves, the point Popup.SetScale keeps) is converted by geometry in frame units, not rounded (0 px). It needs
-  -- no layout (works while hidden) and keeps clamping as it was: the same unclamped rect. "" (default place) stays.
   local PFX = { TOPLEFT = 0, LEFT = 0, BOTTOMLEFT = 0, TOP = 0.5, CENTER = 0.5, BOTTOM = 0.5, TOPRIGHT = 1, RIGHT = 1, BOTTOMRIGHT = 1 }
   local PFY = { BOTTOMLEFT = 0, BOTTOM = 0, BOTTOMRIGHT = 0, LEFT = 0.5, CENTER = 0.5, RIGHT = 0.5, TOPLEFT = 1, TOP = 1, TOPRIGHT = 1 }
   local function bottomLeft(point, rel, x, y, h)
@@ -149,19 +127,15 @@ do
       return nil
     end
     local f = w.frame
-    local k = UIParent:GetEffectiveScale() / f:GetEffectiveScale() -- UIParent units -> frame units
+    local k = UIParent:GetEffectiveScale() / f:GetEffectiveScale()
     return { x = PFX[rel] * UIParent:GetWidth() * k + x - PFX[point] * f:GetWidth(),
              y = PFY[rel] * UIParent:GetHeight() * k + y - PFY[point] * h }
   end
-  -- load = true only from ApplyPosition (the load path), never from a drag stop or a toggle
   local function anchorBottom(load)
     local s = Mrgl.db.settings
     if s.point == "" or s.rel == "" or (s.point == "BOTTOMLEFT" and s.rel == "BOTTOMLEFT") then
       return
     end
-    -- j2b K1 (orchestrator, Jan wants the bar at the bottom): a MINIMIZED pre-j2 save (TOPLEFT of TOPLEFT, j1 kept the
-    -- top edge) puts the bar once at the OLD FULL window's bottom edge (bar bottom = old top - full height): a deliberate
-    -- one-time jump. A full-window TOPLEFT save keeps its 0-px migration; afterwards the save is BOTTOMLEFT (no-op).
     local h = w.frame:GetHeight()
     if load == true and Mrgl.db.settings.minimized == true and s.point == "TOPLEFT" and s.rel == "TOPLEFT" then
       h = M.GEO.h
@@ -173,10 +147,10 @@ do
     s.point = "BOTTOMLEFT"
     s.rel = "BOTTOMLEFT"
     s.x = b.x
-    s.y = b.y -- our SavedVariables own the position
+    s.y = b.y
     if drag.on then
       return
-    end -- j1 #13: nothing sets points during a drag
+    end
     local f = w.frame
     f:ClearAllPoints()
     f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", b.x, b.y)
@@ -185,16 +159,15 @@ do
   function savePosition()
     if drag.on then
       return
-    end -- j1 #13
-    -- GetPoint returns point, relativeTo, relativePoint, x, y
+    end
     local point, _, relPoint, px, py = w.frame:GetPoint(1)
-    w.frame:SetUserPlaced(false) -- our SavedVariables own the position, not layout-local.txt
+    w.frame:SetUserPlaced(false)
     local s = Mrgl.db.settings
     s.point = point
     s.rel = relPoint
     s.x = px
     s.y = py
-    anchorBottom() -- j2 A1: saved as BOTTOMLEFT
+    anchorBottom()
     s.x = math.floor(s.x + 0.5)
     s.y = math.floor(s.y + 0.5)
     if Mrgl.UI.Panel ~= nil then
@@ -205,11 +178,11 @@ do
   M.ApplyPosition = function()
     if drag.on then
       return
-    end -- j1 #13: DragStop applies the position once
+    end
     local s = Mrgl.db.settings
     local f = w.frame
-    f:SetScale(s.scale) -- j2 A1: before the conversion (frame units)
-    anchorBottom(true) -- j2 A1: one-time migration of an old save (TOPLEFT): the window stays where it was (K1: bar)
+    f:SetScale(s.scale)
+    anchorBottom(true)
     f:ClearAllPoints()
     if s.point ~= "" and s.rel ~= "" then
       f:SetPoint(s.point, UIParent, s.rel, s.x, s.y)
@@ -229,16 +202,9 @@ do
       Mrgl.UI.Panel.Reanchor()
     end
   end
-  -- ------------------------------------------------------------ j1 M1-M5: minimize to the head row
-  -- Minimized: 26 px high, only the head frame (stage, pips, gold, minimize, close) stays; the content layer and
-  -- all effect layers are hidden. The core runs on, bindings still work. No animation: the switch is instant.
   local function minSaved()
-    return Mrgl.db.settings.minimized == true -- core builds the field; read defensively
+    return Mrgl.db.settings.minimized == true
   end
-  -- j2 A1 (was j1 M2 anchorTop): the BOTTOM edge stays. SetMinimized converts any other point to BOTTOMLEFT (anchorBottom,
-  -- frame units, not rounded: +-0 px) before the height changes; the default place (BOTTOMRIGHT) keeps its bottom too.
-  -- j1b U3 (UX-A): Restore in the minimized bar in the gold text's colour (white, alpha 1), no glow; it is the bar's only
-  -- control. Minimize in the full window stays muted and turns white on hover (like Close).
   local function minTint(hover)
     if st.min or hover == true then
       K().SetVertex(w.minIcon, C().white)
@@ -246,11 +212,9 @@ do
       K().SetVertex(w.minIcon, C().muted)
     end
   end
-  -- visual state from db.settings.minimized (Build, Reset, SetMinimized); no re-anchor here
   M.ApplyMinimized = function()
     local on = minSaved()
     st.min = on
-    -- New Tide F/Q: minimizing ends the moment at once (veil 0, headlines gone); the popup lives in the full window only
     if on then
       J().TideAbort()
       Mrgl.UI.Popup.TideCancel()
@@ -261,7 +225,7 @@ do
     else
       f:SetHeight(M.GEO.h)
     end
-    local body = { w.zoneLayer, w.surface, w.content, w.fx, w.numbers, w.coins, w.headLayer } -- tide1c C15: zone layer too
+    local body = { w.zoneLayer, w.surface, w.content, w.fx, w.numbers, w.coins, w.headLayer }
     for i = 1, U.Len(body) do
       U.At(body, i):SetShown(not on)
     end
@@ -273,10 +237,9 @@ do
     end
     minTint(w.min:IsMouseOver())
     if on then
-      w.min:SetAlpha(1) -- j1b U3: at once, not only from the next OnUpdate
+      w.min:SetAlpha(1)
     end
     M.PlaceGoldPlus(on)
-    -- the panel closes while minimized; db.settings.panel keeps whether it was open (Panel.Show stays closed)
     local P = Mrgl.UI.Panel
     if P ~= nil and P.w.frame ~= nil then
       if on and P.IsOpen() then
@@ -291,7 +254,6 @@ do
   M.IsMinimized = function()
     return st.min
   end
-  -- "+X" at the gold: under the GoldIcon; minimized left of the gold text (under the icon lies outside the 26-px bar)
   M.PlaceGoldPlus = function(min)
     w.goldPlus:ClearAllPoints()
     if min then
@@ -309,14 +271,13 @@ do
         drag.min = 0
       end
       return
-    end -- j1 #13: after the drag
+    end
     if v == st.min and v == minSaved() then
       return
     end
     anchorBottom()
     Mrgl.db.settings.minimized = v
     M.ApplyMinimized()
-    -- j1b U3 (UX-B S1): the Minimize/Restore tooltip would stay at its old place over the panel; hide it on every toggle
     if GameTooltip:GetOwner() == w.min then
       GameTooltip:Hide()
     end
@@ -326,25 +287,17 @@ do
     M.Refresh()
     if Mrgl.UI.Save ~= nil then
       Mrgl.UI.Save()
-    end -- M5: the state survives /reload at once
+    end
   end
-  -- j1 B2: the tint colour is in the texture itself at alpha 0.28; the gradient only fades its alpha (white vertex 0 -> 1).
-  -- If the client ever drops the gradient, a flat tint at 0.28 stays: never a white area.
   function zoneGradient(tex, tint)
     tex:SetColorTexture(U.At(tint, 1), U.At(tint, 2), U.At(tint, 3), 0.28)
     tex:SetGradient("VERTICAL", CreateColor(1, 1, 1, 0), CreateColor(1, 1, 1, 1))
   end
-  -- ------------------------------------------------------------ build
   M.Build = function()
     local I = Mrgl.Data.Icons
-    -- r2 R1: tooltip border (BackdropTemplate, UI-Tooltip-Border, edge 12, insets 3)
     local f = CreateFrame("Frame", "MrglSquadFrame", UIParent, "BackdropTemplate")
     w.frame = f
     f:SetSize(240, 304)
-    -- j1 P2 (coordinator, Jan's 8-panel-noch-durchsichtig.png): DIALOG, because Attune's tracker is HIGH too
-    -- (Attune.lua:4035) and the order inside one strata is a coin toss. Tooltips (TOOLTIP) stay above.
-    -- Panel, popup and settings are children and inherit it; the levels stay relative (L1). Toplevel + Raise on
-    -- mouse-down: the window comes in front of other DIALOG frames when clicked.
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
     f:HookScript("OnMouseDown", function()
@@ -353,29 +306,22 @@ do
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
-    -- j1 P1: the backdrop draws only the edge; the background is an own opaque texture (Panel.Backdrop)
     w.bg = Mrgl.UI.Panel.Backdrop(f, C().bg)
-    M.Drag(f) -- j1 #13
+    M.Drag(f)
     f:HookScript("OnHide", function()
       M.DragStop()
     end)
     f:HookScript("OnShow", function()
       M.ApplyZoneLook()
-    end) -- tide1c C15
-    -- ---------------- layer frames (L1)
+    end)
     w.surface = layer("MrglSquadSurface", M.LEVEL.surface)
     w.content = layer("MrglSquadContent", M.LEVEL.content)
     w.fx = layer("MrglSquadFx", M.LEVEL.fx)
     w.numbers = layer("MrglSquadNumbers", M.LEVEL.numbers)
     w.coins = layer("MrglSquadCoins", M.LEVEL.coins)
     w.headLayer = layer("MrglSquadHeadline", M.LEVEL.headline)
-    -- j1 M2: the head row has its own frame at the content level; minimized hides content and the other layers
     w.head = layer("MrglSquadHead", M.LEVEL.content)
     local sf = w.surface; local cf = w.content; local hf = w.head
-    -- ---------------- surface: zone tint, spotlight, onboarding ring (behind the enemy)
-    -- tide1c C15: each tint has its own frame; fades and Hide go to the frames, never SetAlpha or an animation on the
-    -- gradient textures (in WoW that flattens the gradient and SetAlpha(0) does not hide it)
-    -- the zone layer (main + 1, under the surface) holds both tint frames; minimized hides it with the other layers
     w.zoneLayer = CreateFrame("Frame", "MrglSquadZone", f)
     w.zoneLayer:SetAllPoints(f)
     w.zoneLayer:SetFrameLevel(f:GetFrameLevel() + 1)
@@ -388,7 +334,7 @@ do
     w.zoneFrameB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -3)
     w.zoneFrameB:SetHeight(127)
     w.zoneFrameB:Hide()
-    w.zoneFrameA:SetFrameLevel(f:GetFrameLevel() + 1) -- under the surface layer (spotlight, whelps), over the window bg
+    w.zoneFrameA:SetFrameLevel(f:GetFrameLevel() + 1)
     w.zoneFrameB:SetFrameLevel(f:GetFrameLevel() + 1)
     w.zoneA = w.zoneFrameA:CreateTexture(nil, "BACKGROUND")
     w.zoneA:SetAllPoints(w.zoneFrameA)
@@ -412,19 +358,16 @@ do
     end)
     w.spot = K().Glow(sf, "glow", 170, C().gold, "ARTWORK")
     w.spot:SetPoint("CENTER", f, "TOPLEFT", M.GEO.enemyX, M.GEO.enemyY)
-    w.spot:SetAlpha(0.15) -- j1 #22
-    -- onboarding: ring hugging the enemy box, behind it (never over the name or HP text)
+    w.spot:SetAlpha(0.15)
     w.onboardRing = K().Glow(sf, "ring", 106, C().gold, "ARTWORK", 1)
     w.onboardRing:SetPoint("CENTER", f, "TOPLEFT", M.GEO.enemyX, M.GEO.enemyY)
     w.onboardRing:Hide()
-    -- ---------------- head
     w.stageWrap = CreateFrame("Frame", "MrglSquadStage", hf)
     lv(w.stageWrap, 2)
     w.stageWrap:SetSize(22, 14)
     w.stageWrap:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -6)
     w.stage = K().Text(w.stageWrap, K().FRIZ, 13, C().gold, "OUTLINE")
     w.stage:SetPoint("LEFT", w.stageWrap, "LEFT", 0, 0)
-    -- j1 A1: no scale above 1.05 outside the rings (was 1.35)
     w.stagePop = w.stageWrap:CreateAnimationGroup()
     K().AddScale(w.stagePop, 1, 1.05, 0.12, 0, 1, "OUT", "LEFT")
     K().AddScale(w.stagePop, 1.05, 1, 0.2, 0, 2, "IN", "LEFT")
@@ -433,10 +376,9 @@ do
       local p = hf:CreateTexture(nil, "ARTWORK")
       p:SetSize(6, 6)
       p:SetPoint("TOPLEFT", f, "TOPLEFT", 40 + (i - 1) * 8, -10)
-      p:SetColorTexture(1, 1, 1, 0.15) -- j1 #19: no pop, the pip only fills
+      p:SetColorTexture(1, 1, 1, 0.15)
       U.Insert(w.pips, p)
     end
-    -- L3: only the skull marks a boss fight (the word "Boss" is gone)
     w.bossMark = K().Icon(hf, I.skull, "ARTWORK")
     w.bossMark:SetSize(12, 12)
     w.bossMark:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -7)
@@ -448,8 +390,6 @@ do
     K().Tip(w.stageHit, function(tt)
       Tips().Stage(tt)
     end)
-    -- New Tide H: TideMark 12 x 12 at the pips' place (like the boss skull; the pips hide while it stands), also minimized.
-    -- Own 16 x 16 button one level over stageHit; it fades in once (0.4 s) and then stands still, no pulse
     w.tideMark = CreateFrame("Button", "MrglSquadTideMark", hf)
     lv(w.tideMark, 3)
     w.tideMark:SetSize(16, 16)
@@ -458,12 +398,11 @@ do
     w.tideMarkIcon:SetSize(12, 12)
     w.tideMarkIcon:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -7)
     w.tideMarkIn = K().FadeIn(w.tideMarkIcon, 0.4)
-    K().Border(w.tideMark, C().gold, "OVERLAY", 1) -- tide1c C9: a static 1-px gold edge round the icon ("ready")
+    K().Border(w.tideMark, C().gold, "OVERLAY", 1)
     M.Drag(w.tideMark)
     K().Tip(w.tideMark, function(tt)
       Tips().TideMark(tt)
     end)
-    -- tide1c C10: tab 4 and, when New Tide is ready, the popup at once (2 clicks instead of 3)
     w.tideMark:SetScript("OnClick", function()
       Mrgl.UI.Panel.OpenTide()
       if Core().Tide.Ready() then
@@ -471,11 +410,9 @@ do
       end
     end)
     w.tideMark:Hide()
-    -- j2 A3: minimize 14x14 at -24 (only while the mouse is over the window), Close at -6, GoldIcon at -46
     w.goldIcon = K().Icon(hf, I.coin, "ARTWORK")
     w.goldIcon:SetSize(13, 13)
     w.goldIcon:SetPoint("TOPRIGHT", f, "TOPRIGHT", -46, -7)
-    -- j1 #20: no gold icon pop
     w.goldWrap = CreateFrame("Frame", "MrglSquadGoldWrap", hf)
     lv(w.goldWrap, 2)
     w.goldWrap:SetSize(90, 16)
@@ -494,8 +431,7 @@ do
     w.goldPlus = K().Text(hf, K().ARIALN, 11, C().good, "OUTLINE")
     M.PlaceGoldPlus(false)
     w.goldPlus:SetJustifyH("RIGHT")
-    w.goldPlus:SetAlpha(0) -- r4 K1: faded per frame (M.GoldPlus), so a long frame cannot skip it
-    -- j1 M1: minimize / restore (minimize.tga, restore.tga while minimized); muted, white on hover, like Close
+    w.goldPlus:SetAlpha(0)
     w.min = CreateFrame("Button", "MrglSquadMinimize", hf)
     lv(w.min, 2)
     w.min:SetSize(14, 14)
@@ -525,7 +461,6 @@ do
     lv(w.close, 2)
     w.close:SetSize(16, 16)
     w.close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -5)
-    -- W1: own white texture, tinted (no rotated color quads)
     w.closeTex = w.close:CreateTexture(nil, "ARTWORK")
     w.closeTex:SetTexture(K().Media(I.close))
     w.closeTex:SetAllPoints(w.close)
@@ -540,49 +475,40 @@ do
     w.close:SetScript("OnClick", function()
       Mrgl.UI.Toggle(false)
     end)
-    -- ---------------- name row (L3: TOP 0,-28, 220 x 20; the headline uses the same place on +10)
     w.name = K().Text(cf, K().FRIZ, 12, C().text, "OUTLINE")
     w.name:SetPoint("CENTER", f, "TOP", 0, -38)
     w.name:SetJustifyH("CENTER")
-    -- ---------------- enemy
     local e = CreateFrame("Button", "MrglSquadEnemy", cf)
     w.enemy = e
     lv(e, 2)
     e:SetSize(88, 88)
     e:SetPoint("TOP", f, "TOP", 0, -50)
-    e:RegisterForClicks("LeftButtonDown", "RightButtonDown") -- j5 K6 (Jan: "mit linksklick UND rechtsklick angreifen")
+    e:RegisterForClicks("LeftButtonDown", "RightButtonDown")
     K().Fill(e, C().black, "BACKGROUND")
     w.enemyBorder = K().Border(e, { 1, 1, 1, 0.25 }, "BORDER", 1)
     w.enemyIcon = K().Icon(e, nil, "ARTWORK")
     w.enemyIcon:SetPoint("TOPLEFT", e, "TOPLEFT", 2, -2)
     w.enemyIcon:SetPoint("BOTTOMRIGHT", e, "BOTTOMRIGHT", -2, 2)
-    -- r4 J1: the dark square of the punch (r3 K2) is a region of the enemy frame, so die/spawn scale and fade it
-    -- with the icon; Juice shows it only with a punch on a living enemy and hides it on KILL and SPAWN
     w.enemyBack = e:CreateTexture(nil, "BACKGROUND", nil, 1)
     w.enemyBack:SetAllPoints(w.enemyIcon)
     K().SetColor(w.enemyBack, C().black)
     w.enemyBack:Hide()
-    -- M3: inner rare border 2 px
     w.enemyRareBorder = K().Border(e, C().rare, "OVERLAY", 1, 2)
     w.enemyRareBorder:SetShown(false)
     w.enemyBadge = e:CreateTexture(nil, "OVERLAY", nil, 2)
     w.enemyBadge:SetSize(16, 16)
     w.enemyBadge:SetPoint("TOPLEFT", e, "TOPLEFT", -4, 4)
     w.enemyBadge:Hide()
-    -- enemies1: a static 1-px black edge behind the boss skull (18 x 18, like the face badge), only with the skull
     w.enemyBadgeBg = e:CreateTexture(nil, "OVERLAY", nil, 1)
     w.enemyBadgeBg:SetSize(18, 18)
     w.enemyBadgeBg:SetPoint("TOPLEFT", e, "TOPLEFT", -5, 5)
     w.enemyBadgeBg:SetColorTexture(0, 0, 0, 1)
     w.enemyBadgeBg:Hide()
-    -- enemies1 G4 (E3.2): King Mrgl-Mrgl. tint = the head desaturated x tint plus an ADD copy at 0.6 x tint (like K.HeadOf);
-    -- face = the human inside, 22 x 22 BOTTOMLEFT 4,4 on a black 24 x 24. Static (alpha only with the picture).
     w.enemyIconAdd = K().Icon(e, nil, "ARTWORK", 1)
     w.enemyIconAdd:SetAllPoints(w.enemyIcon)
     w.enemyIconAdd:SetBlendMode("ADD")
     w.enemyIconAdd:SetDesaturated(true)
     w.enemyIconAdd:Hide()
-    -- enemies1b F3: the old picture during the fast-mode crossfade (above the new picture and its ADD copy, under the badges)
     w.enemyIconOld = K().Icon(e, nil, "ARTWORK", 2)
     w.enemyIconOld:SetAllPoints(w.enemyIcon)
     w.enemyIconOld:Hide()
@@ -595,14 +521,13 @@ do
     w.enemyFace:SetSize(22, 22)
     w.enemyFace:SetPoint("BOTTOMLEFT", e, "BOTTOMLEFT", 4, 4)
     w.enemyFace:Hide()
-    K().Highlight(e, w.enemyIcon, 0.04) -- j1 #27: 0.04 BLEND (was ADD 0.06)
+    K().Highlight(e, w.enemyIcon, 0.04)
     e:SetScript("OnClick", function()
       M.Hit(true)
     end)
     K().Tip(e, function(tt)
       Tips().Enemy(tt)
-    end, { delay = Mrgl.Data.Balance.ENEMY_TIP_DELAY }) -- T2
-    -- ---------------- boss button (V6 teaser from second 0, B4 states, B5 bar)
+    end, { delay = Mrgl.Data.Balance.ENEMY_TIP_DELAY })
     local bb = CreateFrame("Button", "MrglSquadBossButton", cf)
     w.boss = bb
     lv(bb, 2)
@@ -612,7 +537,7 @@ do
     w.bossIcon = K().Icon(bb, nil, "ARTWORK")
     w.bossIcon:SetPoint("TOPLEFT", bb, "TOPLEFT", 2, -2)
     w.bossIcon:SetPoint("BOTTOMRIGHT", bb, "BOTTOMRIGHT", -2, 2)
-    w.bossBorder = K().Border(bb, C().line, "OVERLAY", 0, 2) -- R3: 2 px status border
+    w.bossBorder = K().Border(bb, C().line, "OVERLAY", 0, 2)
     w.bossCd = CreateFrame("Cooldown", "MrglSquadBossCooldown", bb, "CooldownFrameTemplate")
     lv(w.bossCd, 3)
     w.bossCd:SetAllPoints(w.bossIcon)
@@ -635,7 +560,6 @@ do
     K().Tip(bb, function(tt)
       Tips().BossButton(tt)
     end)
-    -- B5 readiness bar
     w.bossBar = CreateFrame("StatusBar", "MrglSquadBossBar", cf)
     lv(w.bossBar, 2)
     w.bossBar:SetSize(34, 3)
@@ -652,7 +576,6 @@ do
     K().AddAlpha(w.bossGrowAnim, 0, 1, 0.15, 0, 1)
     K().AddAlpha(w.bossGrowAnim, 1, 0, 0.3, 1.7, 2)
     w.bossGrowAnim:SetToFinalAlpha(true)
-    -- ---------------- HP (lag bar = frame, red bar on top) and boss timer
     local hpf = CreateFrame("StatusBar", "MrglSquadHP", cf)
     w.hpFrame = hpf
     w.hpLag = hpf
@@ -673,25 +596,22 @@ do
     w.hp:SetMinMaxValues(0, 1)
     w.hpGloss = w.hp:CreateTexture(nil, "OVERLAY")
     w.hpGloss:SetAllPoints(hpTex)
-    w.hpGloss:SetColorTexture(1, 1, 1, 0.18)   -- j1 B2: alpha in the texture, the gradient only fades it
+    w.hpGloss:SetColorTexture(1, 1, 1, 0.18)
     w.hpGloss:SetGradient("VERTICAL", CreateColor(1, 1, 1, 0), CreateColor(1, 1, 1, 1))
     K().Border(w.hp, C().black, "OVERLAY", -1, 1, 1)
     w.hpText = K().Text(w.hp, K().ARIALN, 11, C().white, "OUTLINE")
     w.hpText:SetPoint("CENTER", hpf, "CENTER", 0, 0)
     w.hpText:SetJustifyH("CENTER")
-    -- r3 F1: timer bar 172 wide, left-aligned with HP; the seconds stand right of it (not in the HP bar)
     w.timer = CreateFrame("StatusBar", "MrglSquadTimer", cf)
     lv(w.timer, 2)
     w.timer:SetSize(172, 5)
     w.timer:SetPoint("TOPLEFT", hpf, "BOTTOMLEFT", 0, -3)
     w.timerText = K().Text(cf, K().ARIALN, 12, C().gold, "OUTLINE")
-    w.timerText:SetPoint("LEFT", w.timer, "RIGHT", 4, -3) -- -3: clear of the HP bar edge
+    w.timerText:SetPoint("LEFT", w.timer, "RIGHT", 4, -3)
     w.timerText:SetJustifyH("LEFT")
-    w.timerText:Hide() -- j1 #15: no pop in the last 5 s
-    -- j2 A2: a boss fight frozen by WoW combat (window visible with "Hide in combat" off): a quiet static label on the
-    -- timer, muted, alpha in only; the timer and its seconds dim. Gone when combat ends (M.OnUpdate, pauseLook)
+    w.timerText:Hide()
     w.pausedText = K().Text(cf, K().ARIALN, 11, C().muted, "OUTLINE")
-    w.pausedText:SetPoint("CENTER", w.timer, "CENTER", 0, -3) -- -3: clear of the HP bar edge (like the seconds)
+    w.pausedText:SetPoint("CENTER", w.timer, "CENTER", 0, -3)
     w.pausedText:SetText(S().PAUSED_COMBAT)
     w.pausedText:SetAlpha(0)
     w.pausedText:Hide()
@@ -709,7 +629,6 @@ do
       w.timer:Hide()
       w.timerText:Hide()
     end)
-    -- a hidden window stops the fade without OnFinished (WoW): clean up the same way
     w.timerFade:SetScript("OnStop", function()
       if not Mrgl.db.boss.active then
         w.timer:Hide()
@@ -717,17 +636,14 @@ do
       end
     end)
     w.timer:Hide()
-    -- ---------------- squad (V2: all 6 slots, fixed places)
     w.squad = {  }
     for s = 1, 6 do
       U.Insert(w.squad, buildPortrait(cf, s))
     end
-    -- New Tide K: three companion slots right of the squad (Murky, Tidecaller, King Bagurgle)
     w.comp = {}
     for c = 1, 3 do
       U.Insert(w.comp, buildCompanion(cf, c))
     end
-    -- ---------------- abilities (V1: visible from second 0)
     local ab = CreateFrame("Frame", "MrglSquadAbilities", cf)
     w.abilities = ab
     lv(ab, 2)
@@ -737,7 +653,6 @@ do
     for a = 1, 4 do
       U.Insert(w.ab, buildAbility(ab, a))
     end
-    -- ---------------- expand (V7: from second 0)
     local ex = CreateFrame("Button", "MrglSquadExpand", cf)
     w.expand = ex
     lv(ex, 2)
@@ -763,21 +678,18 @@ do
       else
         Tips().Title(tt, S().SHOW_SHOP)
       end
-      Tips().KeyLine(tt, "MRGLSQUAD_PANEL")   -- port v1: own binding or nothing
+      Tips().KeyLine(tt, "MRGLSQUAD_PANEL")
     end)
     ex:SetScript("OnClick", function()
       Mrgl.UI.Panel.Toggle()
     end)
     M.SetChevron(false)
-    -- ---------------- buy best (V7, E1-E4)
     local b = CreateFrame("Button", "MrglSquadBuyBest", cf)
     w.buy = b
     lv(b, 2)
     b:SetSize(212, 28)
     b:SetPoint("TOP", f, "TOP", 0, -264)
     K().Fill(b, C().panel, "BACKGROUND")
-    -- r3 E7 saving fill: over the background, under icon and text (inset 2); width = gold / cost.
-    -- r4 E14: gold at 0.18 with a 1-px gold edge line on its right side that moves with it (j1 #24: alpha 0.5)
     w.buySave = b:CreateTexture(nil, "BACKGROUND", nil, 1)
     w.buySave:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
     w.buySave:SetHeight(28 - 4)
@@ -808,12 +720,10 @@ do
     w.buyIcon:SetSize(22, 22)
     w.buyIcon:SetPoint("LEFT", b, "LEFT", 3, 0)
     w.buyIcon:Hide()
-    -- r4 E12: the rank of an upgrade stands top left on the icon ("III"), the chain size bottom right like a WoW
-    -- bag stack (from 2); right of the icon only one value: the gain or New!
     w.buyTier = K().Text(b, K().ARIALN, 10, C().white, "OUTLINE")
     w.buyTier:SetPoint("TOPLEFT", w.buyIconBg, "TOPLEFT", 1, -1)
     w.buyTier:SetJustifyH("LEFT")
-    w.buyTier:SetHeight(10) -- r5 C3: rank (top) and stack (bottom) boxes never overlap on the 22er icon
+    w.buyTier:SetHeight(10)
     w.buyTimes = K().Text(b, K().ARIALN, 10, C().white, "OUTLINE")
     w.buyTimes:SetPoint("BOTTOMRIGHT", w.buyIconBg, "BOTTOMRIGHT", -1, 1)
     w.buyTimes:SetJustifyH("RIGHT")
@@ -836,9 +746,7 @@ do
     w.buyGlowFrame:SetAllPoints(b)
     K().Border(w.buyGlowFrame, C().gold, "OVERLAY")
     w.buyGlowFrame:Hide()
-    w.buyGlow = K().Pulse(w.buyGlowFrame, 0.6, 0.4) -- j1 #10: 0 -> 0.6 in 0.4 s, then still
-    -- r3 E7: "+n%" (fill points) for 2 s when the fill grew while the window was closed.
-    -- r4 E14: inside the button, left of the wait time (RIGHT at buyWait LEFT -4); buyCost is the wait text then
+    w.buyGlow = K().Pulse(w.buyGlowFrame, 0.6, 0.4)
     w.buyWait = w.buyCost
     w.buyGrowWrap = CreateFrame("Frame", "MrglSquadBuyGrow", cf)
     lv(w.buyGrowWrap, 3)
@@ -863,15 +771,14 @@ do
     K().Tip(b, function(tt)
       Tips().BuyBest(tt)
     end)
-    -- ---------------- effects, headline, popup
     J().Build(f)
     Mrgl.UI.Popup.BuildWelcome(f)
-    Mrgl.UI.Popup.BuildTide(f) -- New Tide Q
+    Mrgl.UI.Popup.BuildTide(f)
     M.RegisterState()
     f:SetScript("OnUpdate", function(self, elapsed)
       M.OnUpdate(elapsed)
     end)
-    M.ApplyMinimized() -- j1 M5: height first, so the saved anchor places the 26-px bar where it was
+    M.ApplyMinimized()
     M.ApplyPosition()
     return f
   end
@@ -879,9 +786,8 @@ do
     local p = CreateFrame("Frame", "MrglSquadPortrait" .. i, parent)
     lv(p, 2)
     p:SetSize(22, 22)
-    p.baseX = 34 + (i - 1) * 26 -- New Tide K: 26 px apart (was 30), the last one ends at x 186
+    p.baseX = 34 + (i - 1) * 26
     p:SetPoint("TOPLEFT", w.frame, "TOPLEFT", p.baseX, -182)
-    -- W2: icon 22x22 with its own round mask of the same geometry; thin ring 24x24 over it, no mask
     p.head = K().MurlocHead(p, i, 22, "ARTWORK")
     p.head.base:SetAllPoints(p)
     local mask = p:CreateMaskTexture()
@@ -897,12 +803,9 @@ do
     p.count = K().Text(p, K().ARIALN, 10, C().white, "OUTLINE")
     p.count:SetPoint("TOP", p, "BOTTOM", 0, -1)
     p.count:SetJustifyH("CENTER")
-    -- j1 #18: appears 0.9 -> 1 with alpha 0 -> 1 in 0.25 s
     p.popIn = p:CreateAnimationGroup()
     K().AddScale(p.popIn, 0.9, 1, 0.25, 0, 1, "OUT")
     K().AddAlpha(p.popIn, 0, 1, 0.25, 0, 1, "OUT")
-    -- j1 A2 #31/#32: hop 2 px and cheer 3 px only as smoothed Translation groups (sub-pixel, the client interpolates);
-    -- the base position above is set once here and never per frame
     p.hop = p:CreateAnimationGroup()
     K().AddMove(p.hop, 0, 2, 0.20, 0, 1, "OUT")
     K().AddMove(p.hop, 0, -2, 0.25, 0, 2, "IN")
@@ -916,10 +819,6 @@ do
     M.Drag(p)
     return p
   end
-  -- New Tide K: companion slot idx at TOPLEFT 192 / 207 / 222, -186: 14 x 14, round mask, no ring, no motion. Free slots
-  -- stay empty. A new companion fades in (0.4 s) with its headline (Juice holds it until then: st.compHold)
-  -- tide1b T3: murloc heads (tint + badge from Data.Tide), centred on the portrait row (y -193). tide1c C9: 14 px with a
-  -- 1-px gap, after a thin divider at x 189 (the squad's last portrait ends at 186), so they don't read as ranks 7-9
   local COMP_X, COMP_S, COMP_SEP_X = { 192, 207, 222 }, 14, 189
   function buildCompanion(parent, idx)
     local c = Tips().TideCompanion(idx)
@@ -950,7 +849,6 @@ do
     p:Hide()
     return p
   end
-  -- F: the moment holds a new companion and the Anyfin look until their headline shows (Juice), then they fade in
   M.TideHold = function(idx)
     if idx == 0 then
       st.anyfinHold = true
@@ -980,7 +878,6 @@ do
     cp:Show()
     K().Replay(cp.fadeIn)
   end
-  -- F: minimize / hide / new db during the moment: companions and slot 1 stand right at once
   M.TideRelease = function()
     st.compHold = {}
     st.anyfinHold = false
@@ -992,7 +889,6 @@ do
       b.swapIn:Stop()
     end
   end
-  -- N: slot 1 looks like Anyfin Can Happen from Spells 50 (not while the moment still holds it)
   M.AnyfinShown = function()
     return Core().Tide.Has("a", 50) and st.anyfinHold ~= true
   end
@@ -1005,7 +901,7 @@ do
     b.glow = K().Glow(b, "glow", 62, C().gold, "BACKGROUND", -8)
     b.glow:SetPoint("CENTER", b, "CENTER", 0, 0)
     b.glow:Hide()
-    b.glowPulse = K().Pulse(b.glow, 0.5, 0.4) -- j1 #11: 0 -> 0.5 in 0.4 s, then still
+    b.glowPulse = K().Pulse(b.glow, 0.5, 0.4)
     b.buffBorder = K().Border(b, C().gold, "OVERLAY")
     b.buffBorder:SetShown(false)
     b.cd = CreateFrame("Cooldown", ("MrglSquadAbility" .. i) .. "Cooldown", b, "CooldownFrameTemplate")
@@ -1013,9 +909,9 @@ do
     b.cd:SetAllPoints(b.icon)
     b.cd:SetSwipeColor(0, 0, 0, 0.75)
     b.cd:SetDrawEdge(true)
-    b.cd:SetDrawBling(false) -- W6: own ready flash (Juice), same in browser and WoW
+    b.cd:SetDrawBling(false)
     b.cd:SetHideCountdownNumbers(true)
-    b.cd.noCooldownCount = true -- OmniCC / ElvUI
+    b.cd.noCooldownCount = true
     b.top = CreateFrame("Frame", nil, b)
     lv(b.top, 3)
     b.top:SetAllPoints(b)
@@ -1023,15 +919,14 @@ do
     b.time:SetPoint("CENTER", b, "CENTER", 0, 0)
     b.time:SetJustifyH("CENTER")
     b.timeFont = "cd"
-    b.key = K().Text(b.top, K().ARIALN, 10, C().white, "OUTLINE") -- R5: 10 px white a 0.8
+    b.key = K().Text(b.top, K().ARIALN, 10, C().white, "OUTLINE")
     b.key:SetPoint("TOPRIGHT", b, "TOPRIGHT", -2, -2)
     b.key:SetJustifyH("RIGHT")
-    b.key:SetWidth(34) -- port p3 (review p2 WoW K2): button 38 minus 2+2; long keys (MOUSEWHEELUP) are cut by WoW
+    b.key:SetWidth(34)
     b.key:SetAlpha(0.8)
-    b.keyText = "" -- port p2 (review p1 Lua M1): the label comes from the WoW binding, see refreshAbility
+    b.keyText = ""
     b.punch = b:CreateAnimationGroup()
     K().AddScale(b.punch, 0.9, 1, 0.1, 0, 1, "OUT")
-    -- New Tide F: the Anyfin swap of slot 1, alpha only: the icon out in 0.3 s, the new icon in 0.3 s
     b.swapOut = b.icon:CreateAnimationGroup()
     K().AddAlpha(b.swapOut, 1, 0, 0.3, 0, 1)
     b.swapOut:SetToFinalAlpha(true)
@@ -1058,7 +953,6 @@ do
     end)
     return b
   end
-  -- W1: one chevron texture, mirrored by its tex coords when the panel is open
   M.SetChevron = function(open)
     if open then
       w.chev:SetTexCoord(1, 0, 0, 1)
@@ -1066,18 +960,17 @@ do
       w.chev:SetTexCoord(0, 1, 0, 1)
     end
   end
-  -- ------------------------------------------------------------ actions
   M.Hit = function(manual)
-    K().TipPoke(w.enemy) -- T2: a click hides the delayed enemy tooltip and restarts the wait
+    K().TipPoke(w.enemy)
     if manual == true then
       J().ManualClick()
-      st.clickAt = GetTime() -- j1c M4: the dim reads the last click
+      st.clickAt = GetTime()
     end
     if not Mrgl.db.onboarding.firstClick then
       w.onboardRing:Hide()
     end
     Core().Combat.Click(manual == true)
-    J().Punch() -- j4 H2 (b): after the click, so the killing hit has no punch (the enemy is locked then)
+    J().Punch()
   end
   M.FightBoss = function()
     if Core().Combat.GateOpen() then
@@ -1092,12 +985,11 @@ do
     end
   end
   M.BuyBest = function()
-    K().TipPoke(w.enemy) -- r4 T6: a Buy best click (also by key) restarts the enemy tooltip wait as well
+    K().TipPoke(w.enemy)
     local ok = Core().Shop.BuyBest()
     M.Refresh()
     return ok
   end
-  -- ------------------------------------------------------------ state handlers (no juice, run while hidden too)
   M.RegisterState = function()
     local On = Core().On
     On("ABILITY_UNLOCK", function(p)
@@ -1109,20 +1001,18 @@ do
     On("COMBAT", function(p)
       Mrgl.UI.OnCombat(p.on, p.gold)
     end)
-    -- r3 G1: the boss button stays away for 3 s after a fight (also while the window is hidden)
     On("BOSS_WIN", function()
       st.bossAwayUntil = GetTime() + BOSS_AWAY
       st.hpFrac = 0
       st.lag = 0
       st.lagDelay = 0
       w.hpLag:SetValue(0)
-      w.hp:SetValue(0) -- r5 C4: no HP remnant after a win
+      w.hp:SetValue(0)
     end)
     On("BOSS_FAIL", function()
       st.bossAwayUntil = GetTime() + BOSS_AWAY
     end)
   end
-  -- r2 L6: an ability unlocked this session glows (10 s ahead of Buy best, then until used or 120 s)
   M.UnlockAge = function(id)
     local t = st.unlockAt[id]
     if t == nil then
@@ -1130,13 +1020,10 @@ do
     end
     return GetTime() - t
   end
-  -- ------------------------------------------------------------ refresh (<= 20 Hz)
-  -- spotlight: candle warm, rare blue (M3), else the zone tint
   function spotLook()
     local db = Mrgl.db
     local e = Core().Combat.Enemy()
     if Core().Combat.CandleActive() then
-      -- j1 #22: 0.15, rare 0.22, candle 0.25
       K().SetVertex(w.spot, { 1, 0.8, 0.4, 1 })
       w.spot:SetAlpha(0.25)
       return
@@ -1151,8 +1038,6 @@ do
     w.spot:SetAlpha(0.15)
   end
   M.SpotLook = spotLook
-  -- j5 K5 (b): a held enemy (rt.enemyBank > 0, Core MIN_LIFE) drains along its life floor. Between the 0.1-s core steps
-  -- the bar follows the floor at this frame (age + rt.acc), so the drain is smooth (width only, no flash).
   M.HpShown = function(hp, max)
     local rt, ml = Core().rt, Mrgl.Data.Balance.MIN_LIFE
     local f = 0
@@ -1165,13 +1050,6 @@ do
     end
     return f
   end
-  -- tide1d D2: in fast mode the picture (and the name with it) swaps at most once per LOOK_HOLD s;
-  -- the HP bar and number stay live (Refresh). force: faction switch.
-  -- enemies1b F4: a boss start swaps everything at once (picture, name, red colour, border, skull) and starts a new hold;
-  -- everything else, the boss end too, holds picture and name together (the shown boss stays until the hold is over;
-  -- j4 H4: its skull and edge go at once).
-  -- enemies1b F3: a held swap in fast mode fades the old picture out over LOOK_XFADE s (alpha only, w.enemyIconOld on top
-  -- of the new one); a boss start and a faction switch cut.
   local LOOK_HOLD, LOOK_XFADE = 2, 0.15
   function setEnemyLook(force)
     local db = Mrgl.db
@@ -1179,11 +1057,9 @@ do
     local key = e.icon .. "|" .. e.name .. "|" .. e.kind
     local boss = db.boss.active == true
     if key ~= st.lookKey then
-      -- a swap made in fast mode holds its 2 s even when fast mode ends meanwhile (no quick swap at the edge)
       local fast = J().FastFarm()
       local held = force ~= true and not (boss and not st.lookBoss) and (fast or st.lookFast)
       if held and GetTime() - st.lookT < LOOK_HOLD then
-        -- j4 H4 (UX-B): the boss is over, so the skull and its edge go at once (the held picture stays)
         if st.lookBoss and not boss then
           w.enemyBadge:Hide()
           w.enemyBadgeBg:Hide()
@@ -1245,7 +1121,7 @@ do
       K().SetVertex(w.enemyBadge, C().rare)
       w.enemyBadge:SetBlendMode("ADD")
       w.enemyBadge:SetSize(28, 28)
-      w.enemyBadge:SetAlpha(0.6) -- j1 #23
+      w.enemyBadge:SetAlpha(0.6)
       w.enemyBadge:Show()
       w.enemyBadgeBg:Hide()
     else
@@ -1255,7 +1131,6 @@ do
     spotLook()
   end
   M.SetEnemyLook = setEnemyLook
-  -- enemies1 G4: tint and face go with the picture (held with it in fast mode); without the fields all of it is off
   M.EnemyLookExtra = function(e)
     local t = e.tint
     if t ~= nil then
@@ -1292,10 +1167,8 @@ do
     spotLook()
     zoneTint(tint, instant)
   end
-  -- the tint itself: at once, or a 1-s fade-in of the new layer (also /mrgl debug zone next, j1 B2).
-  -- tide1c C15: only the frames fade or hide; the outgoing layer is hidden, never set to alpha 0
   function zoneTint(tint, instant)
-    st.zoneFading = true -- the OnStop below must not settle the old state over the new one
+    st.zoneFading = true
     if w.zoneFadeA:IsPlaying() then
       w.zoneFadeA:Stop()
     end
@@ -1324,8 +1197,6 @@ do
     g:Play()
   end
   M.ZoneTint = zoneTint
-  -- tide1c C15: the zone look from the state (main frame OnShow, UI.Reset, the end of every fade): the active layer has
-  -- the gradient of the current tint at frame alpha 1, the other layer is hidden; a fade that still runs stops first
   M.ApplyZoneLook = function()
     if w.zoneFrameA == nil or st.tintNow == nil or st.zoneFading then
       return
@@ -1353,14 +1224,12 @@ do
     local db = Mrgl.db
     local Cb = Core().Combat
     local A = Core().Abilities
-    -- head
     local stageStr = "" .. db.stage
-    if stageStr ~= st.stageStr then -- port p2 (review p1 WoW S3): SetText only on a change
+    if stageStr ~= st.stageStr then
       st.stageStr = stageStr
       w.stage:SetText(stageStr)
     end
     local gate = Cb.GateOpen()
-    -- New Tide H: the hint stands while New Tide is available and no boss fight runs (WoW combat does not count)
     local mark = Core().Tide.Avail() and not db.boss.active
     if mark ~= w.tideMark:IsShown() then
       w.tideMark:SetShown(mark)
@@ -1380,9 +1249,7 @@ do
       end
     end
     w.bossMark:SetShown(db.boss.active)
-    st.goldTo = math.max(0, db.gold - st.goldHold - J().HeldGold()) -- j1 W2: a waiting gold moment holds its gold
-    -- enemy
-    -- j1 #22: the spotlight follows the candle buff also while the enemy is locked (ABILITY_USE fires before the buff)
+    st.goldTo = math.max(0, db.gold - st.goldHold - J().HeldGold())
     if not st.enemyLocked then
       setEnemyLook()
     else
@@ -1400,11 +1267,10 @@ do
       w.hpText:SetText("")
     else
       w.hpText:SetText(U.Short(math.ceil(hp)))
-    end -- L2: empty in the pause
+    end
     if not st.zoneDefer then
       M.SetZone(false)
     end
-    -- timer
     if db.boss.active then
       if not w.timer:IsShown() then
         w.timer:Show()
@@ -1422,17 +1288,15 @@ do
         tc = C().timerLow
       elseif left <= 10 then
         tc = C().timerMid
-      end -- R3
+      end
       w.timer:SetStatusBarColor(U.At(tc, 1), U.At(tc, 2), U.At(tc, 3), 1)
       K().SetTextColor(w.timerText, tc)
       w.timerText:SetText("" .. math.ceil(left))
-      -- j1 #15: no pulse in the last 5 s, only the colour above
     elseif w.timer:IsShown() and not w.timerFade:IsPlaying() then
       w.timer:Hide()
       w.timerText:Hide()
     end
     refreshBossButton()
-    -- squad (V2): all six, not hired = dim head, no count, no ring
     for s = 1, 6 do
       local pt = U.At(w.squad, s)
       local n = db.murlocs[F().Murloc(s).id].n
@@ -1445,14 +1309,13 @@ do
         else
           pt.head.SetState("dim")
           pt:SetAlpha(0.35)
-        end -- r3 U5
+        end
         pt.ring:SetShown(hired)
         pt.count:SetShown(hired)
       end
       pt.count:SetText("" .. n)
-      K().SetTextColor(pt.count, C().white) -- r5 C5: a count is never red (red = not affordable, prices only)
+      K().SetTextColor(pt.count, C().white)
     end
-    -- New Tide K: companions (never removed: there is no respec); one held by the moment waits for its headline
     for ci = 1, 3 do
       local cp = U.At(w.comp, ci)
       local want = Tips().TideCompanion(ci).has and st.compHold[ci] ~= true
@@ -1460,7 +1323,7 @@ do
         cp:SetShown(want)
       end
     end
-    w.compSep:SetShown(U.At(w.comp, 1):IsShown() or U.At(w.comp, 2):IsShown()) -- tide1c C9
+    w.compSep:SetShown(U.At(w.comp, 1):IsShown() or U.At(w.comp, 2):IsShown())
     for a = 1, 4 do
       refreshAbility(U.At(w.ab, a))
     end
@@ -1471,7 +1334,6 @@ do
     end
     K().RefreshTip()
   end
-  -- B5: readiness bar; called on purchases and on window open (Juice shows +n%)
   M.Strength = function()
     return Core().Boss.Strength()
   end
@@ -1485,7 +1347,6 @@ do
     if not shown then
       w.bossBar:Hide()
       st.bossState = "hidden"
-      -- r3 G1: the rings go with the button (any start: auto, click, key Q, opener)
       if J().BossRingsShown() then
         J().BossRingsOff()
       end
@@ -1522,7 +1383,6 @@ do
       end
       w.bossBorder.SetColor(bc)
     end
-    -- B5 bar: only at an open gate, hidden when full
     local str = Bo.Strength()
     if gate and str < 1 then
       w.bossBar:Show()
@@ -1531,7 +1391,6 @@ do
     else
       w.bossBar:Hide()
     end
-    -- auto-fight countdown as a cooldown swipe (S5; the shrinking ring is in Juice)
     if a.state == "countdown" then
       if not st.autoCd then
         st.autoCd = true
@@ -1557,8 +1416,6 @@ do
       K().SetFont(b.time, K().ARIALN, 13, "OUTLINE")
     end
   end
-  -- port p2 (review p1 Lua M1): WoW starts unbound, so the corner label shows the player's own binding or nothing
-  -- (data key "1".."4" was the browser's fixed key). Modifiers short like the action bars: SHIFT-1 -> s-1.
   local KEY_SHORT = { { "SHIFT-", "s-" }, { "CTRL-", "c-" }, { "ALT-", "a-" } }
   local function keyLabel(binding)
     local k = GetBindingKey(binding)
@@ -1577,7 +1434,6 @@ do
   function refreshAbility(b)
     local A = Core().Abilities
     local d = U.At(Mrgl.Data.Abilities, b.slot)
-    -- New Tide N: slot 1 as Anyfin Can Happen (the swap animation sets it at its middle)
     if d.alt ~= nil and not b.swapOut:IsPlaying() then
       if M.AnyfinShown() then
         K().SetIcon(b.icon, d.alt.icon)
@@ -1587,7 +1443,6 @@ do
     end
     local unlocked = A.Unlocked(d.id)
     if not unlocked then
-      -- V1: locked but visible: desaturated, alpha 0.35, unlock stage in muted
       b.icon:SetDesaturated(true)
       b:SetAlpha(0.35)
       setTimeFont(b, "locked")
@@ -1611,7 +1466,7 @@ do
     b.key:SetShown(key ~= "")
     setTimeFont(b, "cd")
     local buff = A.BuffLeft(d.id)
-    local rest = math.min(A.Remaining(d.id), d.cd) -- r3 K1: never more than the cooldown itself
+    local rest = math.min(A.Remaining(d.id), d.cd)
     local state = "ready"
     if buff > 0 then
       state = "buff"
@@ -1652,7 +1507,6 @@ do
       U.At(w.buyHeads, h):SetShown(h == i)
     end
   end
-  -- r4 E13: a chain gain < 1 % looks like "no target": icon desaturated (heads grey, without tint and glow copy)
   function buyDesat(on)
     local st2 = "full"
     if on then
@@ -1667,7 +1521,6 @@ do
     w.buySave:SetShown(on)
     w.buySaveEdge:SetShown(on)
   end
-  -- r3 P1: a gain token in its colour (muted "<1%", else good)
   M.GainText = function(fs, p)
     fs:SetText(U.Gain(p))
     if U.GainLow(p) then
@@ -1676,7 +1529,6 @@ do
       K().SetTextColor(fs, C().good)
     end
   end
-  -- r3 E7: fill target 0..1 while Buy best waits for gold (-1 = no fill)
   function saveTarget(ch)
     if ch == nil or ch.affordable or not (ch.first.cost > 0) then
       return -1
@@ -1686,7 +1538,6 @@ do
   M.SaveFill = function()
     return st.saveFill
   end
-  -- window closes: remember the fill; window opens: "+n%" when it grew (called by main.js)
   M.SaveMark = function()
     st.saveMark = saveTarget(Core().Shop.Chain())
   end
@@ -1694,7 +1545,7 @@ do
     local cur = saveTarget(Core().Shop.Chain())
     local was = st.saveMark
     st.saveMark = -1
-    st.saveFill = cur -- no slide on open: the fill shows the truth at once, the text tells the growth
+    st.saveFill = cur
     if cur < 0 or was < 0 then
       return
     end
@@ -1705,12 +1556,15 @@ do
     M.GainText(w.buyGrow, d)
     K().Replay(w.buyGrowAnim)
   end
+  M.BuyShown = function()
+    return st.buyAff == true
+  end
   function refreshBuyBest()
     local db = Mrgl.db
     local pop = Core().rt.popup
     if st.wasPopup and not pop then
       st.collectPulse = true
-    end -- E1: the first target after Collect always pulses
+    end
     st.wasPopup = pop
     local ch = Core().Shop.Chain()
     M.chain = ch
@@ -1726,8 +1580,8 @@ do
       saveShown(false)
     end
     st.buyLow = false
+    st.buyAff = false
     if ch == nil then
-      -- E2: nothing worth buying
       w.buy:SetAlpha(0.4)
       showHead(0)
       w.buyIcon:Hide()
@@ -1747,28 +1601,23 @@ do
     elseif t.kind == "upgrade" then
       showHead(t.slot)
       w.buyIcon:Hide()
-      w.buyTier:SetText(U.Roman(t.tier)) -- E12: top left on the icon
+      w.buyTier:SetText(U.Roman(t.tier))
     else
       showHead(0)
       K().SetIcon(w.buyIcon, U.At(Mrgl.Data.Self, t.slot).icon)
       w.buyIcon:Show()
     end
-    -- E13: chain gain < 1 % (not for a new rank, which says New!): dimmed like "no target", still clickable
     st.buyLow = not ch.isNew and U.GainLow(ch.gain)
-    buyDesat(st.buyLow)
-    -- V7: dimmed until the very first target is affordable
+    st.buyAff = ch.affordable
+    buyDesat(not ch.affordable)
     if not db.onboarding.firstHire and not ch.affordable then
       w.buy:SetAlpha(0.4)
-    elseif st.buyLow then
-      w.buy:SetAlpha(0.5)
     else
       w.buy:SetAlpha(1)
     end
-    -- E12: chain size from 2 as a stack count on the icon; right of the icon the chain gain (New! for a new rank)
     if ch.n >= 2 then
       w.buyTimes:SetText("" .. ch.n)
     end
-    -- r5 C3: no role badge on the Buy best icon while the rank or the stack count stands on it
     local tierText = w.buyTier:GetText()
     local timesText = w.buyTimes:GetText()
     local plain = (tierText == nil or tierText == "") and (timesText == nil or timesText == "")
@@ -1780,13 +1629,12 @@ do
       end
     end
     if ch.isNew then
-      -- E8: the first piece is a new rank: the label says New!, the chain gain stands in the tooltip only
       K().SetFont(w.buyGain, K().ARIALN, 10, "OUTLINE")
       w.buyGain:SetText(S().BUY_NEW)
       K().SetTextColor(w.buyGain, C().good)
     else
       K().SetFont(w.buyGain, K().ARIALN, 12, "OUTLINE")
-      M.GainText(w.buyGain, ch.gain) -- r3 P1
+      M.GainText(w.buyGain, ch.gain)
     end
     if ch.affordable then
       w.buyCost:SetText(U.ShortUp(ch.cost))
@@ -1802,7 +1650,6 @@ do
       w.buyCoin:Show()
     end
   end
-  -- r3 E7: the fill follows the gold smoothly (0.2 s), per frame
   function updateSaveFill(dt)
     if st.saveTo < 0 then
       return
@@ -1821,16 +1668,11 @@ do
     end
     w.buySave:SetWidth(px)
     saveShown(true)
-    -- r5 C2: the 1-px edge stays off while it would cross a text in the button (2 px margin): the fill alone shows it.
-    -- The edge x relative to the button's left edge: buySave starts at +2 and is px wide (= buySave:GetRight() - left).
     if edgeHitsText(2 + px) then
       w.buySaveEdge:Hide()
     end
   end
-  -- Port-plan 6 (v1): the text spans are measured (GetLeft/GetRight lay the strings out) only when a text, its
-  -- lit state or its visibility changes, or the scale changes; per frame only cheap getters and arithmetic run.
-  -- Spans are stored relative to the button's left edge, so moving the window needs no new measurement.
-  local edgeTexts -- the five texts of the button, filled on first use
+  local edgeTexts
   local edgeText = {}; local edgeLit = {}; local edgeVis = {}
   local edgeSpans = {}
   local edgeDirty = true
@@ -1838,7 +1680,7 @@ do
     edgeSpans = {}
     local bl = w.buy:GetLeft()
     if bl == nil then
-      return -- not laid out yet: stays dirty, measured again next frame
+      return
     end
     edgeDirty = false
     for i = 1, #edgeTexts do
@@ -1864,7 +1706,7 @@ do
       local lit = fs:GetAlpha() > 0
       if fs == w.buyGrow then
         lit = w.buyGrowAnim:IsPlaying()
-      end -- its alpha lives in the animation
+      end
       local text = fs:GetText()
       local vis = fs:IsVisible()
       if text ~= edgeText[i] or lit ~= edgeLit[i] or vis ~= edgeVis[i] then
@@ -1885,8 +1727,6 @@ do
     end
     return false
   end
-  -- E1 pulse rule for the one-glow logic: gain >= 3 %, the onboarding target, or the first target after Collect.
-  -- r4 E13: never for a chain gain < 1 %
   M.BuyWantsGlow = function()
     local ch = M.chain
     if ch == nil or not ch.affordable or st.buyLow then
@@ -1897,9 +1737,6 @@ do
     end
     return ch.gain >= Mrgl.Data.Balance.BESTBUY_GLOW_MIN
   end
-  -- r4 K1: "+X" at the gold (combat end, return to the tab). Faded per frame instead of an animation group: a long
-  -- frame (OnUpdate elapsed >= 5 s = return) would run a group to its end in the same frame. The frame that starts it
-  -- does not advance it. instant: starts fully visible (a return shows the result at once).
   function plusAlpha(t)
     if t < PLUS_IN then
       return t / PLUS_IN
@@ -1938,8 +1775,6 @@ do
     end
     w.goldPlus:SetAlpha(plusAlpha(st.plusT))
   end
-  -- ------------------------------------------------------------ per-frame (OnUpdate) work
-  -- j2 A2: "Paused in combat" while a boss fight is frozen by WoW combat (only seen with "Hide in combat" off)
   local function pauseLook()
     local on = Mrgl.db.boss.active and Core().rt.inCombat == true
     if on == st.paused then
@@ -1950,7 +1785,7 @@ do
       w.pausedText:SetAlpha(0)
       w.pausedText:Show()
       K().Replay(w.pausedIn)
-      w.timer:SetAlpha(0) -- j2b UX-A 1: no bar under the label (fill and background), only the seconds at 0.3
+      w.timer:SetAlpha(0)
       w.timerText:SetAlpha(0.3)
     else
       w.pausedIn:Stop()
@@ -1967,14 +1802,12 @@ do
     st.t = st.t + dt
     pauseLook()
     updateGoldPlus(dt)
-    -- W5: 1-px lines follow scale changes
     local es = w.frame:GetEffectiveScale()
     if es ~= st.pxScale then
       st.pxScale = es
       K().PixelRefresh()
-      edgeDirty = true -- C2 text spans: measure again at the new scale
+      edgeDirty = true
     end
-    -- gold rolls up in 0.3 s, spending shows at once
     if st.goldTo < st.goldShown then
       st.goldShown = st.goldTo
       st.goldFrom = st.goldTo
@@ -1985,22 +1818,20 @@ do
     end
     st.goldTarget = st.goldTo
     if st.goldT < 1 then
-      st.goldT = math.min(1, st.goldT + dt / J().GoldRoll()) -- 0.3 s, a gold moment 0.6 s (j1 G)
+      st.goldT = math.min(1, st.goldT + dt / J().GoldRoll())
       st.goldShown = st.goldFrom + (st.goldTo - st.goldFrom) * st.goldT
     else
       st.goldShown = st.goldTo
     end
     local goldStr = U.Short(math.floor(st.goldShown))
-    if goldStr ~= st.goldStr then -- port p2 (review p1 WoW S3): SetText only on a change (every frame before)
+    if goldStr ~= st.goldStr then
       st.goldStr = goldStr
       w.goldText:SetText(goldStr)
     end
-    -- j5 K5 (b): the drain of a held enemy moves every frame
     if Core().rt.enemyBank ~= nil and Core().rt.enemyBank > 0 and Core().rt.respawn <= 0 then
       st.hpFrac = M.HpShown(math.max(0, Mrgl.db.enemyHp), F().EnemyHP(Mrgl.db.stage))
       w.hp:SetValue(st.hpFrac)
     end
-    -- HP lag: waits 0.15 s, then follows with 0.35 s smoothing
     if st.hpFrac >= st.lag then
       st.lag = st.hpFrac
       st.lagDelay = 0.15
@@ -2011,11 +1842,13 @@ do
     end
     if st.lag - st.hpFrac < 0.004 then
       st.lag = st.hpFrac
-    end -- r5 C4: the smoothing never leaves a sliver
+    end
     w.hpLag:SetValue(st.lag)
+    local chNow = Core().Shop.Chain()
+    if chNow ~= M.chain or (chNow ~= nil and chNow.affordable ~= st.buyAff) then
+      refreshBuyBest()
+    end
     updateSaveFill(dt)
-    -- T5 / j1 M1: minimize only while the mouse is over the window (in 0.15 s, out 0.4 s).
-    -- j1b U3: minimized, Restore is the bar's only control and always shows (alpha 1)
     local over = w.frame:IsMouseOver()
     if over then
       st.hoverA = math.min(1, st.hoverA + dt / 0.15)
@@ -2027,7 +1860,7 @@ do
     else
       w.min:SetAlpha(st.hoverA)
     end
-    if drag.on and M.DragDebug ~= nil then -- j1b D1: drag log while moving, every 0.25 s
+    if drag.on and M.DragDebug ~= nil then
       drag.dbgT = drag.dbgT + dt
       if drag.dbgT >= 0.25 then
         drag.dbgT = 0
@@ -2036,22 +1869,20 @@ do
     end
     if drag.on and not IsMouseButtonDown("LeftButton") then
       M.DragStop()
-    end -- j1 #13: missed OnDragStop
-    -- L3: the name fades out (0.1 s) while a headline runs, back in 0.2 s
+    end
     if st.nameA > st.nameTarget then
       st.nameA = math.max(st.nameTarget, st.nameA - dt / 0.1)
     elseif st.nameA < st.nameTarget then
       st.nameA = math.min(st.nameTarget, st.nameA + dt / 0.2)
     end
     w.name:SetAlpha(st.nameA)
-    -- j1b G1: the enemy icon is the stage of the gold moment only by alpha (no move, no scale)
     local dim = M.DIM
     local dimTo = 1
     if J().EnemyDim() then
       dimTo = dim.a
       if GetTime() - st.clickAt < dim.clickT then
         dimTo = dim.aClick
-      end -- j1c M4
+      end
     end
     if st.dimA > dimTo then
       st.dimA = math.max(dimTo, st.dimA - dt * (1 - dim.a) / dim.inT)
@@ -2059,15 +1890,13 @@ do
       st.dimA = math.min(dimTo, st.dimA + dt * (1 - dim.a) / dim.outT)
     end
     w.enemyIcon:SetAlpha(st.dimA)
-    if st.xfade > 0 then -- enemies1b F3: the old picture fades out, linear, alpha only
+    if st.xfade > 0 then
       st.xfade = math.max(0, st.xfade - dt)
       w.enemyIconOld:SetAlpha(st.dimA * st.xfade / LOOK_XFADE)
       if st.xfade <= 0 then
         w.enemyIconOld:Hide()
       end
     end
-    -- j1 A2 #30/#31: no squad bob and no per-frame SetPoint. Every 1.5 s one hired murloc hops (Translation group), never
-    -- while another hop, a cheer or a pop-in runs (at most one murloc moves). Calm mode: still (A3)
     if not db.settings.calm then
       st.hopT = st.hopT + dt
       if st.hopT >= 1.5 then

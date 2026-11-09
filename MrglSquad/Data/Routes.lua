@@ -1,16 +1,7 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - routes, zones, enemies, bosses, quotes (plan 4.1). Literal tables only.
--- Zones 1-5 per faction, zones 6-11 shared. Stage s: zone = min(11, floor((s-1)/10)+1) (New Tide D: 11 = Blackwing Lair).
--- enemies1 (docs/enemies-plan.md): 6 normals per zone sorted by threat (Combat.EnemyAt pairs them by position),
--- 2 named rares per zone (Combat.Enemy, by stage parity), King Mrgl-Mrgl as the stage-50 boss of both factions.
--- normals: N1-N3 before the mini boss, N4-N6 after it (N5/N6 "Elite" in the tooltip, N6 = the followers of the boss).
 Mrgl.Data = Mrgl.Data or {}
-
--- E3: a human in a murloc costume. tint = felt-coloured head (desaturated + vertex colour), face = the human inside
--- (badge on the enemy picture), type = creature type line in the tooltip. Used as alliance[5].boss and horde[5].boss
 local KING_MRGL = { name = "King Mrgl-Mrgl", shortName = "Mrgl-Mrgl", icon = "INV_Misc_Head_Murloc_01",
                     tint = {1.0, 0.30, 0.25}, face = "INV_Misc_Head_Human_01", type = "Humanoid (murloc costume)" }
-
 Mrgl.Data.Routes = {
   alliance = {
     { id = "elwynn", name = "Elwynn Forest", level = "1–10", tint = {0.30, 0.55, 0.25},
@@ -180,9 +171,8 @@ Mrgl.Data.Routes = {
                  { name = "Ancient Core Hound", icon = "Spell_Shadow_SummonFelhunter" } },
       mini = { name = "Majordomo Executus", shortName = "Executus", icon = "Spell_Fire_SealOfFire" },
       boss = { name = "Ragnaros", icon = "INV_Hammer_Unique_Sulfuras" },
-      rares = { { name = "Lucifron", icon = "Spell_Fire_SealOfFire" },   -- MC has no rares in Classic: real MC bosses
+      rares = { { name = "Lucifron", icon = "Spell_Fire_SealOfFire" },
                { name = "Magmadar", icon = "Spell_Shadow_SummonFelhunter" } } },
-    -- New Tide D: zone 11, from stage 111 on BWL repeats (HP and gold depend on the stage only)
     { id = "blackwing", name = "Blackwing Lair", level = "60", tint = {0.55, 0.15, 0.12},
       normals = { { name = "Blackwing Technician", icon = "INV_Misc_Bomb_01" },
                  { name = "Blackwing Legionnaire", icon = "INV_Misc_Head_Orc_01" },
@@ -192,7 +182,7 @@ Mrgl.Data.Routes = {
                  { name = "Chromatic Drakonid", icon = "INV_Misc_Head_Dragon_Green" } },
       mini = { name = "Chromaggus", icon = "INV_Misc_Head_Dragon_Blue" },
       boss = { name = "Nefarian", icon = "INV_Misc_Head_Dragon_Black" },
-      rares = { { name = "Vaelastrasz the Corrupt", shortName = "Vaelastrasz", icon = "INV_Misc_Head_Dragon_Red" },   -- BWL has no rares in Classic: real BWL bosses
+      rares = { { name = "Vaelastrasz the Corrupt", shortName = "Vaelastrasz", icon = "INV_Misc_Head_Dragon_Red" },
                { name = "Broodlord Lashlayer", shortName = "Broodlord", icon = "INV_Misc_Head_Dragon_01" } } }
   },
   FACTION_ZONES = 5

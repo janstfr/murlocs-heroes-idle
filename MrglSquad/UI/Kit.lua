@@ -1,8 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Kit.lua: colors and widget helpers (Fill, Border, Text, Icon, Button, Anim).
--- Only WoW API calls (CreateFrame, CreateTexture, SetPoint, ...). Port of web/ui/Kit.js (port-plan 2.4).
--- Kit pseudo-objects (K.Border, K.MurlocHead) accept both call forms: obj.SetShown(on) and obj:SetShown(on)
--- (same for SetColor / SetState), so a dot/colon slip in a caller cannot shift the arguments.
 Mrgl.UI = Mrgl.UI or {}
 do
   local pixelLine, inUI, inPanel, setIconTexture
@@ -18,21 +14,21 @@ do
     gold = { 1, 0.82, 0, 1 },
     white = { 1, 1, 1, 1 },
     text = { 0.94, 0.93, 0.89, 1 },
-    tipText = { 0.82, 0.82, 0.80, 1 },   -- r2 T3
+    tipText = { 0.82, 0.82, 0.80, 1 },
     muted = { 0.60, 0.59, 0.55, 1 },
     bad = { 1, 0.30, 0.30, 1 },
     good = { 0.35, 0.90, 0.35, 1 },
-    warn = { 1, 0.60, 0.10, 1 },          -- r2 R3
+    warn = { 1, 0.60, 0.10, 1 },
     hp = { 0.78, 0.13, 0.10, 1 },
     hpTop = { 0.95, 0.30, 0.22, 1 },
     hpLag = { 0.85, 0.55, 0.25, 0.9 },
     crit = { 1, 0.62, 0.10, 1 },
     boss = { 1, 0.55, 0.15, 1 },
-    rare = { 0.40, 0.70, 1.00, 1 },       -- r2 M3
-    ability = { 1, 0.92, 0.55, 1 },       -- r2 L2 (ability numbers)
+    rare = { 0.40, 0.70, 1.00, 1 },
+    ability = { 1, 0.92, 0.55, 1 },
     leeroy = { 1, 0.5, 0.1, 1 },
     timerMid = { 1, 0.5, 0.1, 1 },
-    timerLow = { 1, 0.35, 0.10, 1 },      -- r2 R3
+    timerLow = { 1, 0.35, 0.10, 1 },
     dim = { 1, 1, 1, 0.15 },
     dark = { 0.10, 0.08, 0.03, 1 },
   }
@@ -59,8 +55,6 @@ do
   K.SetTextColor = function(fs, c)
     fs:SetTextColor(c[1], c[2], c[3], c[4])
   end
-  -- Port-plan 3: FRIZQT__ is unchecked on Forever. Only an explicit failure (SetFont returns false) falls back
-  -- to the font of GameFontNormal, at the same size and flags.
   K.SetFont = function(fs, font, size, flags)
     local ok = fs:SetFont(font, size, flags)
     if ok == false and GameFontNormal ~= nil then
@@ -84,15 +78,12 @@ do
     K.SetColor(t, c)
     return t
   end
-  -- 4 lines of `thick` pixels (ForeverIdle "Border"). inset = pixels inside the frame edge.
-  -- r2 W5: line thickness goes through PixelUtil (whole physical pixels) and is set again on scale changes.
   local pixelLines = {}
   function pixelLine(tex, horiz, thick)
     local e = { tex = tex, horiz = horiz, thick = thick }
     tinsert(pixelLines, e)
     K.PixelApply(e)
   end
-  -- port p2 (review p1 WoW S1): without PixelUtil the plain size (not pixel-snapped) instead of an error in Build
   K.PixelApply = function(e)
     local P = PixelUtil
     if e.horiz then
@@ -109,7 +100,6 @@ do
       end
     end
   end
-  -- Call after SetScale (and DISPLAY_SIZE_CHANGED / UI_SCALE_CHANGED)
   K.PixelRefresh = function()
     for i = 1, #pixelLines do
       K.PixelApply(pixelLines[i])
@@ -151,7 +141,6 @@ do
     lines.right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -o, o + t)
     pixelLine(lines.right, false, t)
     local b = { lines = lines }
-    -- b.SetColor(c2, a) or b:SetColor(c2, a)
     b.SetColor = function(x, c2, a)
       if x ~= b then
         x, c2, a = b, x, c2
@@ -161,7 +150,6 @@ do
       K.SetColor(lines.left, c2, a)
       K.SetColor(lines.right, c2, a)
     end
-    -- b:SetShown(on) or b.SetShown(on)
     b.SetShown = function(x, on)
       if x ~= b then
         on = x
@@ -202,15 +190,12 @@ do
     end
     return fs
   end
-  -- Port-plan 3: an icon missing on Forever shows the question mark. Only an explicit failure (SetTexture returns
-  -- false) falls back; a client that returns nothing keeps the texture as set.
   function setIconTexture(t, name)
     local ok = t:SetTexture(K.IconPath(name))
     if ok == false then
       t:SetTexture(K.IconPath(Mrgl.Data.Icons.question))
     end
   end
-  -- Icon texture with the standard edge crop
   K.Icon = function(frame, name, layer, sub)
     local L = layer
     if L == nil then
@@ -233,14 +218,9 @@ do
       setIconTexture(tex, name)
     end
   end
-  -- r2 M1: murloc head = INV_Misc_Head_Murloc_01, tinted per rank (desaturated base x tint + ADD copy at 0.6 x tint),
-  -- role badge bottom left (10 px on 22er heads, 12 px on 28-32er). Returns {base, add, badge, badgeBg, SetState}.
-  -- SetState("full" | "dim"): dim = only the base, no ADD copy (locked / not hired); alpha is up to the caller.
-  -- No grey icon copies in WoW: every grey look is SetDesaturated.
   K.MurlocHead = function(frame, i, size, layer)
     return K.HeadOf(frame, Mrgl.Core.Formula.Murloc(i), size, layer)
   end
-  -- tide1b T3: the same head for any { icon, tint, badge, natural } (New Tide companions); badge 7 px under 20-px heads
   K.HeadOf = function(frame, m, size, layer)
     local L = layer
     if L == nil then
@@ -278,7 +258,6 @@ do
     end
     h.state = "full"
     h.shown = true
-    -- h:SetShown(on) or h.SetShown(on)
     h.SetShown = function(x, on)
       if x ~= h then
         on = x
@@ -293,8 +272,6 @@ do
         h.badgeBg:SetShown(on)
       end
     end
-    -- r4 E13: "grey" = like dim, but without the rank tint (a fully desaturated head)
-    -- h.SetState(st) or h:SetState(st)
     h.SetState = function(x, st)
       if x ~= h then
         st = x
@@ -321,7 +298,6 @@ do
     end
     return h
   end
-  -- Murloc accent colour (ring, row accents): Tinyfin has its own, the others use their tint
   K.MurlocColor = function(i)
     local m = Mrgl.Core.Formula.Murloc(i)
     local c = m.tint
@@ -330,7 +306,6 @@ do
     end
     return { c[1], c[2], c[3], 1 }
   end
-  -- Own texture (glow, ring, spark): white + alpha, tinted via vertex color
   K.Glow = function(frame, name, size, c, layer, sub)
     local L = layer
     if L == nil then
@@ -351,7 +326,6 @@ do
     end
     return t
   end
-  -- HIGHLIGHT layer texture (shown by the client while the mouse is over the button)
   K.Highlight = function(btn, region, alpha, add)
     local h = btn:CreateTexture(nil, "HIGHLIGHT")
     if region == nil then
@@ -361,7 +335,7 @@ do
     end
     local al = alpha
     if al == nil then
-      al = 0.04   -- j1 A1 #27
+      al = 0.04
     end
     h:SetColorTexture(1, 1, 1, al)
     if add == true then
@@ -369,7 +343,6 @@ do
     end
     return h
   end
-  -- Icon button: black 1-px frame, icon inside, hover highlight. size = outer size.
   K.IconButton = function(parent, name, size, icon)
     local b = CreateFrame("Button", name, parent)
     b:SetSize(size, size)
@@ -380,9 +353,6 @@ do
     b.hl = K.Highlight(b, b.icon, 0.15, true)
     return b
   end
-  -- Pressed look: content 1 px right/down while the mouse button is held (plan 3.6)
-  -- Moves every anchor point of the region, so two-point regions keep their size.
-  -- GetPoint(i) returns point, relativeTo, relativePoint, x, y (Lua: p[1]..p[5]).
   K.PressOffset = function(btn, region)
     local saved
     btn:HookScript("OnMouseDown", function()
@@ -406,10 +376,6 @@ do
       saved = nil
     end)
   end
-  -- ------------------------------------------------------------ tooltips (r2 T1, T2)
-  -- No tooltip ever lies over the window or the panel: ANCHOR_NONE, placed at the outer edge of the
-  -- window+panel group on the side with more room; top edge = owner top, clamped to the screen;
-  -- if neither side fits, above the group.
   function inUI(f, v)
     return v * f:GetEffectiveScale() / UIParent:GetEffectiveScale()
   end
@@ -419,7 +385,7 @@ do
       return false
     end
     local p = owner
-    while p ~= nil and p ~= UIParent do   -- GetParent() is nil at the top
+    while p ~= nil and p ~= UIParent do
       if p == P.w.frame then
         return true
       end
@@ -431,7 +397,7 @@ do
     local main = Mrgl.UI.Main.w.frame
     local P = Mrgl.UI.Panel
     local tip = GameTooltip
-    if main:GetLeft() == nil or owner:GetTop() == nil then   -- W3: not visible
+    if main:GetLeft() == nil or owner:GetTop() == nil then
       return
     end
     local l = inUI(main, main:GetLeft()); local r = inUI(main, main:GetRight()); local top = inUI(main, main:GetTop())
@@ -459,8 +425,6 @@ do
         side = "left"
       end
     end
-    -- tide1c C3: the preferred outer side, then the other outer side of the group, then above it only if that fits on
-    -- the screen, else below it. Never clamped onto the header
     local xl = gl - 4 - tw; local xr = gr + 4
     local fitL = xl >= 0; local fitR = xr + tw <= sw
     local x = 0; local found = false
@@ -501,12 +465,6 @@ do
     end
     tip:SetPoint("TOP", UIParent, "BOTTOMLEFT", cx, (gb - 4) / ts)
   end
-  -- Tooltip on hover. build(tooltip, owner) fills the lines. opts.delay: seconds of hover before it shows (T2).
-  -- j1c U2 (UX-A 3): the delay is real time (GetTime) since the last click or mouse-enter, not summed frame dt (j1b capped
-  -- dt at 0.1 s, so under load the 0.8-s wait took 8+ slow frames). GetTime is the time of the current frame: a click
-  -- handled between frames right after a hitch carries the old frame's time. So the wait starts at the first frame whose
-  -- time is later than the click (fresh: at = that frame's time) and never shows the tooltip in that frame; from then on
-  -- real time decides. Costs at most one frame of extra delay.
   local tipWait = { owner = nil, at = 0, delay = 0, fresh = false }
   local tipTimer = CreateFrame("Frame")
   tipTimer:Hide()
@@ -537,8 +495,6 @@ do
     tipWait.fresh = true
     tipTimer:Show()
   end
-  -- j2b WoW S1: none of our tooltips in combat (window, panel, bar, minimap button; with "Hide in combat" off).
-  -- rt.inCombat is our flag from PLAYER_REGEN_DISABLED to _ENABLED, so it also covers InCombatLockdown()
   K.NoTips = function()
     local rt = Mrgl.Core.rt
     return rt ~= nil and rt.inCombat == true
@@ -561,7 +517,6 @@ do
     frame.mrglTipDelay = delay
     frame:HookScript("OnEnter", function(self)
       self.mrglHover = true
-      -- r4 T6: a delayed tooltip always waits its full delay from OnEnter (not from the last click)
       if delay > 0 then
         tipStart(self, delay)
         return
@@ -578,15 +533,12 @@ do
     end)
     frame:EnableMouse(true)
   end
-  -- port p2 (review p1 Lua M2): hide GameTooltip only while one of our frames owns it (owner.mrglTip)
   K.HideOwnTip = function()
     local o = GameTooltip:GetOwner()
-    -- port p3 (review p2 WoW K3): never index a forbidden owner
     if o ~= nil and not (o.IsForbidden ~= nil and o:IsForbidden()) and o.mrglTip ~= nil then
       GameTooltip:Hide()
     end
   end
-  -- T2: a click (or Space/F on the hovered enemy) hides a delayed tooltip and restarts the wait
   K.TipPoke = function(frame)
     if frame.mrglTipDelay == nil or frame.mrglTipDelay <= 0 then
       return
@@ -598,14 +550,12 @@ do
       tipStart(frame, frame.mrglTipDelay)
     end
   end
-  -- Rebuild an open tooltip (values change while hovering), at most 5 times a second (W8)
   local lastTipRefresh = 0
   K.RefreshTip = function()
     local o = GameTooltip:GetOwner()
     if o == nil or not GameTooltip:IsShown() then
       return
     end
-    -- j1c H3: a forbidden tooltip or owner (secure UI) is not ours to touch; checked before any field of the owner
     if (GameTooltip.IsForbidden ~= nil and GameTooltip:IsForbidden()) or (o.IsForbidden ~= nil and o:IsForbidden()) then
       return
     end
@@ -615,21 +565,19 @@ do
     if K.NoTips() then
       GameTooltip:Hide()
       return
-    end -- j2b WoW S1: ours, and combat started: away
+    end
     local now = GetTime()
     if now - lastTipRefresh < 0.2 then
       return
     end
     lastTipRefresh = now
-    GameTooltip:ClearLines()   -- no SetOwner: that would re-anchor and reset the tooltip
+    GameTooltip:ClearLines()
     o.mrglTip(GameTooltip, o)
     GameTooltip:Show()
-    -- j1b W1: owners with their own anchor (the minimap button) keep it; the rebuild only refreshes the lines
     if o.mrglTipKeepAnchor ~= true then
       K.PlaceTip(o)
     end
   end
-  -- Lets a child frame move the main window by dragging
   K.DragThrough = function(frame, target, onStop)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function()
@@ -642,14 +590,12 @@ do
       end
     end)
   end
-  -- ------------------------------------------------------------ animation helpers (AnimationGroup only)
   K.Replay = function(g)
     if g:IsPlaying() then
       g:Stop()
     end
     g:Play()
   end
-  -- Scale animation values: SetScaleFrom/SetScaleTo, older clients only know SetFromScale/SetToScale (RezRadar)
   K.ScaleFrom = function(a, x, y)
     if a.SetScaleFrom then
       a:SetScaleFrom(x, y)
@@ -700,15 +646,12 @@ do
     end
     return a
   end
-  -- j1 A1: a glow fades in once (0 -> to in dur) and then stands still. No loop (the BOUNCE pulse is gone).
-  -- The region itself keeps alpha `to`, so the glow stays after the group has ended.
   K.Pulse = function(region, to, dur)
     local g = region:CreateAnimationGroup()
     K.AddAlpha(g, 0, to, dur, 0, 1, "OUT")
     region:SetAlpha(to)
     return g
   end
-  -- Slide in from an offset: order 1 jumps to (dx, dy) instantly, order 2 moves back, plus fade in
   K.SlideIn = function(region, dx, dy, dur)
     local g = region:CreateAnimationGroup()
     K.AddMove(g, dx, dy, 0, 0, 1)

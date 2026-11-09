@@ -1,16 +1,12 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - New Tide paths, milestones, companions, trophies (ngplus-plan N). Literal tables only.
--- Every New Tide adds 1 point to one path, forever. companion = slot right of the squad (K), toggle = settings key (R2/R3).
--- tide1b T3: a companion is a murloc head tinted `tint` with `badge` (like the squad heads); T6: icon = a wave (both clients)
 Mrgl.Data = Mrgl.Data or {}
-
 Mrgl.Data.Tide = {
   icon = "Spell_Frost_SummonWaterElemental",
   first = {
     { id = "quartermaster", icon = "INV_Crate_01", toggle = "autobuy",
       name = "Murloc Quartermaster", text = "Buy best runs by itself every 10 seconds." },
     { id = "murky", icon = "INV_Misc_Head_Murloc_01", companion = 1, tint = { 0.60, 0.85, 1.00 }, badge = "INV_Misc_Fish_02",
-      name = "Murky", text = "Joins the squad and fights along." } }, -- enemies1 N1: no flavour (C14)
+      name = "Murky", text = "Joins the squad and fights along." } },
   paths = {
     { id = "m", name = "Murlocs", icon = "INV_Misc_Head_Murloc_01", per = "Each point: +50% murloc damage.", tag = "Best while away",
       ms = {

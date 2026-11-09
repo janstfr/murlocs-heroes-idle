@@ -1,5 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/Combat.lua equivalent: clicks, hits, kills, respawn, stages, rares (plan 4.1, 5.1).
 Mrgl.Core = Mrgl.Core or {}
 do
   local F, B, rollBuckets, recordClick
@@ -13,7 +12,6 @@ do
   function B()
     return Mrgl.Data.Balance
   end
-  -- ------------------------------------------------------------ route
   Cb.Route = function(zi)
     local R = Mrgl.Data.Routes
     if zi <= R.FACTION_ZONES then
@@ -24,10 +22,6 @@ do
   Cb.Zone = function(s)
     return Cb.Route(F().ZoneIndex(s))
   end
-  -- enemy definition for stage s and kill k (1-10)
-  -- enemies1 E1.1: position 1-9 picks a pair of the 6 normals (sorted by threat), the kill alternates inside the pair:
-  -- pos 1-2 N1/N2, 3-4 N2/N3, 5 mini, 6-7 N4/N5, 8-9 N5/N6, 10 boss. rank = N index (the tooltip says "Elite" at 5-6), 0 for
-  -- mini, boss and rare. Bosses pass shortName and the optional look fields tint / face / type (King Mrgl-Mrgl, E3).
   local PAIR = { 1, 1, 2, 2, 0, 4, 4, 5, 5 }
   local function bossEntry(b)
     return { name = b.name, icon = b.icon, kind = "boss", rank = 0, shortName = b.shortName, tint = b.tint, face = b.face, type = b.type }
@@ -41,7 +35,7 @@ do
     if pos == 10 then
       return bossEntry(z.boss)
     end
-    local i = U.At(PAIR, pos) + (s + k) % 2   -- nonneg (stage, kill >= 1)
+    local i = U.At(PAIR, pos) + (s + k) % 2
     local e = U.At(z.normals, i)
     return { name = e.name, icon = e.icon, kind = "normal", rank = i }
   end
@@ -55,16 +49,14 @@ do
   Cb.Enemy = function()
     local db = Mrgl.db
     local e = Cb.EnemyAt(db.stage, Cb.KillIndex())
-    -- enemies1 E4: a rare is one of the 2 named rares of the zone, chosen by stage parity (only enemyRare is saved)
     if db.enemyRare and e.kind == "normal" then
-      local r = U.At(Cb.Zone(db.stage).rares, db.stage % 2 + 1)   -- nonneg (stage >= 1)
+      local r = U.At(Cb.Zone(db.stage).rares, db.stage % 2 + 1)
       e = { name = r.name, icon = r.icon, kind = "rare", rank = 0, shortName = r.shortName }
     end
     return e
   end
-  -- enemies1 E4.1: rare key "zoneId:i" of stage s (same choice as Cb.Enemy) and the seen list stats.rareSeen
   Cb.RareKey = function(s)
-    return Cb.Zone(s).id .. ":" .. (s % 2 + 1)   -- nonneg (stage >= 1)
+    return Cb.Zone(s).id .. ":" .. (s % 2 + 1)
   end
   Cb.MarkRare = function(s)
     local st = Mrgl.db.stats
@@ -93,15 +85,12 @@ do
   Cb.LeeroyActive = function()
     return Mrgl.db.buffs.leeroy > C.Now()
   end
-  -- kind: "click" (own), "whelp" (Many Whelps!), "auto" (New Tide auto-click) - LEEROY's 10 s rush makes every own click
-  -- (and whelp click) crit, never an auto click
   Cb.CritChance = function(kind)
     if Cb.LeeroyActive() and (kind == "click" or (kind == "whelp" and B().LEEROY_RUSH_WHELPS)) then
       return 1
     end
     return F().CritChance(Mrgl.db.self, Cb.CandleActive())
   end
-  -- ------------------------------------------------------------ measured clicks (last 30 s)
   function rollBuckets()
     local rt = C.rt
     local sec = math.floor(rt.clock)
@@ -112,7 +101,7 @@ do
       end
     else
       for s = rt.bucketSec + 1, sec do
-        U.Set(rt.buckets, s % n + 1, 0)   -- nonneg (server seconds)
+        U.Set(rt.buckets, s % n + 1, 0)
       end
     end
     rt.bucketSec = sec
@@ -129,17 +118,16 @@ do
     rollBuckets()
     local rt = C.rt
     local n = U.Len(rt.buckets)
-    local idx = rt.bucketSec % n + 1   -- nonneg (server seconds)
+    local idx = rt.bucketSec % n + 1
     U.Set(rt.buckets, idx, U.At(rt.buckets, idx) + 1)
   end
-  Cb.SetClickRate = function(cps) -- for tests and presets
+  Cb.SetClickRate = function(cps)
     local l = C.rt.buckets
     for i = 1, U.Len(l) do
       U.Set(l, i, cps)
     end
     C.rt.bucketSec = math.floor(C.rt.clock)
   end
-  -- ------------------------------------------------------------ gold
   Cb.AddGold = function(g)
     local db = Mrgl.db
     db.gold = db.gold + g
@@ -147,13 +135,10 @@ do
     if C.rt.inCombat then
       C.rt.combatGold = C.rt.combatGold + g
     end
-    -- j1: in catch-up (quiet) Fire drops these juice events anyway; skipping the call saves the payload table per kill
     if C.rt.quiet ~= true then
       C.Fire("GOLD", { amount = g })
     end
   end
-  -- ------------------------------------------------------------ hits
-  -- manual = true for real clicks/keys (counted for the click rate)
   Cb.Click = function(manual, kind)
     local db = Mrgl.db
     local rt = C.rt
@@ -166,10 +151,8 @@ do
       return
     end
     if rt.respawn > 0 then
-      -- New Tide C4: an auto click is not queued (a queued click would pay the real-click gold)
       if kind ~= "auto" and rt.queued < B().CLICK_QUEUE then
         rt.queued = rt.queued + 1
-        -- tide1c C2: the queue keeps the hit kind (a whelp hit stays a whelp hit: no click gold, number or punch)
         local qk = kind
         if qk == nil then
           qk = "click"
@@ -190,20 +173,12 @@ do
     if crit then
       dmg = dmg * F().CritMult(db.self)
     end
-    -- r2 B2: a kill by a real click (mouse, key, queued) pays double
     local g = 1
     if kind == "click" then
       g = B().CLICK_KILL_GOLD
     end
     Cb.Hit(dmg, kind, crit, g)
   end
-  -- n Many Whelps! clicks of one tick as one bundle (Abilities.Step).
-  -- tide1d D1 online: Cb.WhelpLive - exactly n x Click(false, "whelp") (same RNG draws, same HP arithmetic, same queue,
-  -- so run 1 and the balance stay byte-identical), but ONE HIT per bundle and no CRIT event:
-  --   HIT { amount = sum of the click hits, kind = "whelp", crit = false, bundle = n clicks, crits = k }
-  -- crit is false on purpose: whelp hits never start the crit flash or the punch (Jan's calm rule); the UI adds them
-  -- silently to lane L (keyed on kind "whelp"). A killing bundle fires its HIT before the KILL; the rest of the tick queues.
-  -- tide1c C6 catch-up (rt.quiet): Cb.WhelpQuiet below - aggregated crits, no HIT.
   Cb.WhelpBurst = function(n)
     if C.rt.quiet == true then
       Cb.WhelpQuiet(n)
@@ -251,10 +226,6 @@ do
       C.Fire("HIT", { amount = sum, kind = "whelp", crit = false, bundle = cnt, crits = cr })
     end
   end
-  -- tide1c C6: catch-up only. Crits = k x chance rounded with one random draw: the right mean but almost no spread, fine
-  -- for silent catch-up, not meant for online play (lua review tide1c K2). A kill takes the clicks it needs on average,
-  -- the rest is queued as whelp hits like single clicks during the respawn. Same expected damage and gold.
-  -- j5 K5: a kill held by MIN_LIFE swallows the rest of the bundle (overkill, as online).
   Cb.WhelpQuiet = function(n)
     local db = Mrgl.db
     local rt = C.rt
@@ -293,15 +264,6 @@ do
       end
     end
   end
-
-  -- ------------------------------------------------------------ j5 K5: minimum enemy lifetime (Balance.MIN_LIFE)
-  -- No enemy (normal, rare, boss) dies before it has lived MIN_LIFE seconds (rt.enemyAge: game time since its spawn,
-  -- advanced in Cb.Squad; the respawn pause and a frozen boss fight do not count). While age < MIN_LIFE the HP cannot go
-  -- below the floor max x (1 - age / MIN_LIFE); damage below it is held in rt.enemyBank and lands as the floor sinks, so a
-  -- one-shot enemy drains linearly and dies exactly at MIN_LIFE. HP above the floor is unaffected (slow enemies unchanged).
-  -- The hit that first brought the true remaining life (enemyHp - enemyBank) to 0 is the killer (rt.killSet/killGold/
-  -- killKind): its gold multiplier and kind go to Kill, so a held real click still pays the click-kill gold.
-  -- MIN_LIFE 0 = the old behaviour. Every hit still fires HIT with its full amount.
   Cb.EnemyAge = function()
     return C.rt.enemyAge
   end
@@ -321,7 +283,6 @@ do
     end
     return F().EnemyHP(Mrgl.db.stage) * (1 - age / ml)
   end
-  -- amount of damage on the current enemy, held below the floor; goldMult/kind of the hit (kind nil = squad)
   Cb.Damage = function(amount, goldMult, kind)
     local db = Mrgl.db
     local rt = C.rt
@@ -346,7 +307,6 @@ do
       rt.enemyBank = rt.enemyBank + amount - room
     end
   end
-  -- held damage lands as far as the floor allows
   local function release()
     local db = Mrgl.db
     local rt = C.rt
@@ -361,7 +321,6 @@ do
     db.enemyHp = db.enemyHp - take
     rt.enemyBank = rt.enemyBank - take
   end
-  -- the enemy dies (HP <= 0): the recorded killer (held hit) or this hit pays
   Cb.Die = function(goldMult, kind)
     local rt = C.rt
     local g, k = goldMult, kind
@@ -372,15 +331,12 @@ do
     Cb.NewLife()
     Cb.Kill(g, k)
   end
-
-  -- A hit on the current enemy. Returns true when it killed.
   Cb.Hit = function(amount, kind, crit, goldMult)
     local db = Mrgl.db
     local rt = C.rt
     if rt.respawn > 0 then
       return false
     end
-    -- New Tide C4: auto-click damage joins the squad number (1x/s), the UI shows no own number for kind "auto"
     if kind == "auto" then
       rt.squadDealt = rt.squadDealt + math.min(amount, math.max(0, db.enemyHp - rt.enemyBank))
     end
@@ -399,19 +355,13 @@ do
     end
     return false
   end
-
-  -- Brings the next enemy in at once (abilities never hit air).
   Cb.EnsureEnemy = function()
-    -- queued clicks are dropped here: they could kill the fresh enemy before the ability lands
     if C.rt.respawn > 0 then
       C.rt.respawn = 0
       C.rt.queued = 0
       Cb.Spawn()
     end
   end
-
-  -- Squad damage over dt seconds, exact across kills and the respawn pause (no overkill carry).
-  -- j5 K5: also the clock of the enemy age; the enemy dies at max(time the damage needs, MIN_LIFE - age).
   Cb.Squad = function(dt)
     local db = Mrgl.db
     local rt = C.rt
@@ -430,13 +380,12 @@ do
           Cb.Spawn()
         end
       elseif rt.enemyBank == 0 and (not (ml ~= nil and ml > 0) or rt.enemyAge >= ml) then
-        -- grown-up enemy, nothing held: as before MIN_LIFE
         if not (d > 0) then
           return
         end
         if db.boss.active and rt.inCombat then
           return
-        end -- boss fight frozen in combat
+        end
         local need = db.enemyHp / d
         if need <= t then
           rt.squadDealt = rt.squadDealt + db.enemyHp
@@ -450,8 +399,8 @@ do
       else
         if db.boss.active and rt.inCombat then
           return
-        end -- frozen: the age stands still too
-        local eff = db.enemyHp - rt.enemyBank -- true remaining life
+        end
+        local eff = db.enemyHp - rt.enemyBank
         local need2 = 0
         if eff > 0 then
           if d > 0 then
@@ -461,7 +410,7 @@ do
           end
         end
         local tDie = math.max(need2, math.max(0, ml - rt.enemyAge))
-        if tDie <= t + 1e-9 then -- 1e-9: eight 0.1-s ticks sum to 0.7999999999999999
+        if tDie <= t + 1e-9 then
           if eff > 0 then
             rt.squadDealt = rt.squadDealt + eff
           end
@@ -492,8 +441,6 @@ do
     C.rt.squadDealt = 0
     return v
   end
-  -- ------------------------------------------------------------ kill, spawn, stages
-  -- kind: hit kind of the last hit ("click", "whelp", "mrgl", "leeroy") or undefined (squad)
   Cb.Kill = function(goldMult, kind)
     local db = Mrgl.db
     local rt = C.rt
@@ -503,12 +450,11 @@ do
     local g = F().Gold(s, boss, rare, db.murlocs) * goldMult
     db.stats.kills = db.stats.kills + 1
     if rare and not boss then
-      Cb.MarkRare(s) -- enemies1 E4.1: seen rares (also in catch-up)
+      Cb.MarkRare(s)
     end
     rt.respawn = B().RESPAWN
     Cb.AddGold(g)
     if boss then
-      -- the victory headline waits for a running LEEROY headline (r2 L3)
       rt.respawn = B().BOSS_RESPAWN + math.max(0, rt.leeroyLine)
       C.Fire("KILL", { gold = g, boss = true, rare = false, stage = s, pip = 0, leeroy = kind == "leeroy", click = kind == "click" })
       Mrgl.Core.Boss.Win(g)
@@ -541,7 +487,7 @@ do
       db.maxStage = s
       if s > db.prestige.best then
         db.prestige.best = s
-      end -- New Tide C5: highest stage ever, live
+      end
       Mrgl.Core.Abilities.CheckUnlock()
     end
     C.Fire("STAGE", { stage = s })
@@ -553,7 +499,7 @@ do
     local db = Mrgl.db
     local rt = C.rt
     db.enemyHp = F().EnemyHP(db.stage)
-    Cb.NewLife() -- j5 K5
+    Cb.NewLife()
     db.enemyRare = false
     if not F().IsBoss(db.stage) and db.rareStage ~= db.stage and U.Rand() < B().RARE_CHANCE then
       db.enemyRare = true
@@ -571,7 +517,7 @@ do
       if rt.respawn > 0 then
         break
       end
-      local qk = U.At(rt.queueKinds, i) -- tide1c C2: replay with the stored kind
+      local qk = U.At(rt.queueKinds, i)
       if qk == nil then
         qk = "click"
       end

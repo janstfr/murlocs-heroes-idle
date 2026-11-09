@@ -1,8 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - Core/World.lua equivalent: gold for in-world events (j1 W1, W4): quest turned in, level up, new zone.
--- The UI never computes amounts; it calls these and shows the WORLD_BONUS moment. No RNG, now = Core.Now() (server s).
--- db.chars["Name-Realm"] = { maxLevel, zones = { [mapID] = true }, qTimes = { t, ... }, qIds = { questID or 0, ... } }
--- qTimes/qIds: the counted quests of the last WORLD_QUEST_WINDOW seconds (parallel lists). maxLevel 0 = not seen yet.
 Mrgl.Core = Mrgl.Core or {}
 do
   local B, num, credit
@@ -16,7 +12,6 @@ do
   function num(v)
     return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge
   end
-  -- key as ForeverIdle Core.lua:161: UnitName("player") .. "-" .. GetRealmName()
   W.CharKey = function(name, realm)
     local n = "?"
     local r = "?"
@@ -28,9 +23,6 @@ do
     end
     return n .. "-" .. r
   end
-  -- First sight creates the record with maxLevel = level and no reward. mapID (optional): the zone the character
-  -- stands in on first sight, also without reward. A known character only gets maxLevel raised silently (levelled
-  -- with the addon off). Returns the record.
   W.SeeChar = function(key, level, mapID)
     local db = Mrgl.db
     local lv = 0
@@ -49,7 +41,6 @@ do
     end
     return rec
   end
-  -- W1: max(KILLS x kill gold, SEC x idle income) at the farm stage, rounded up to whole gold
   W.Amount = function(kind)
     local db = Mrgl.db
     local b = B()
@@ -71,7 +62,6 @@ do
     end
     return math.ceil(math.max(k * g1, sec * inc))
   end
-  -- gold is credited at once and saved; the UI stages the moment (W2)
   function credit(kind, n)
     local db = Mrgl.db
     local gold = W.Amount(kind)
@@ -93,8 +83,6 @@ do
     C.Fire("SAVE")
     return gold
   end
-  -- QUEST_TURNED_IN. 0 when the same questID was counted within WORLD_QUEST_LOCK s, or WORLD_QUEST_MAX quests were
-  -- counted in the rolling WORLD_QUEST_WINDOW. questID may be nil (then only the hourly limit applies).
   W.Quest = function(key, questID, now)
     local b = B()
     local t0 = now
@@ -132,7 +120,6 @@ do
     U.Insert(rec.qIds, id)
     return credit("quest", 1)
   end
-  -- PLAYER_LEVEL_UP. Gold only when level > maxLevel (a /reload or an old level never pays twice).
   W.Level = function(key, level)
     if not (num(level) and level >= 1) then
       return 0
@@ -140,7 +127,7 @@ do
     local lv = math.floor(level)
     local rec = Mrgl.db.chars[key]
     if rec == nil or rec.maxLevel < 1 then
-      W.SeeChar(key, lv) -- first sight: no reward
+      W.SeeChar(key, lv)
       return 0
     end
     if lv <= rec.maxLevel then
@@ -149,7 +136,6 @@ do
     rec.maxLevel = lv
     return credit("level", lv)
   end
-  -- ZONE_CHANGED_NEW_AREA with C_Map.GetBestMapForUnit("player"). Once per character and mapID.
   W.Zone = function(key, mapID)
     if not num(mapID) then
       return 0
@@ -158,10 +144,8 @@ do
     if rec.zones[mapID] == true then
       return 0
     end
-    -- j1b W5: the first valid mapID of a character (none known yet, e.g. GetBestMapForUnit was nil at login) is
-    -- its starting zone: recorded silently, no payout
     local known = false
-    for _ in pairs(rec.zones) do   -- order does not matter
+    for _ in pairs(rec.zones) do
       known = true
       break
     end

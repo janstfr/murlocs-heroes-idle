@@ -1,7 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Tooltips.lua equivalent: every tooltip text (plan 3.7, r2 T3/T4/E1/E5), built from Data.Strings.
--- r2 T3: text tipText, values white, good values green as a whole token (|cff..|r colour codes), hints muted.
--- Numbers exact (U.Exact), costs round up (E6). r3 P1: gains via U.Gain (whole token, `muted` below 1 %), shares via U.Share.
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, S, Core, F, title, line, double, w, g, exactUp, gainTok, costTok, upgEffect
@@ -28,8 +25,6 @@ do
     end
     tt:SetText(text, Mrgl.U.At(col, 1), Mrgl.U.At(col, 2), Mrgl.U.At(col, 3))
   end
-  -- enemies1 N2: every line wraps (a long line like "Path bonus: ..., on top of the tide." must never be cut); only an
-  -- explicit false keeps one line
   function line(tt, text, c, wrap)
     local col = c
     if c == nil then
@@ -37,7 +32,6 @@ do
     end
     tt:AddLine(text, Mrgl.U.At(col, 1), Mrgl.U.At(col, 2), Mrgl.U.At(col, 3), wrap ~= false)
   end
-  -- left text in tipText, right value in white (or c)
   function double(tt, left, right, c)
     local lc = K().C.tipText
     local rc = c
@@ -46,27 +40,24 @@ do
     end
     tt:AddDoubleLine(left, right, Mrgl.U.At(lc, 1), Mrgl.U.At(lc, 2), Mrgl.U.At(lc, 3), Mrgl.U.At(rc, 1), Mrgl.U.At(rc, 2), Mrgl.U.At(rc, 3))
   end
-  -- numbers as the JS would print them ("" + n): U.Str, never Lua's own tostring
   function w(v)
     if type(v) == "number" then
       v = U.Str(v)
     end
     return U.Color(K().C.white, v)
-  end -- value in white
+  end
   function g(v)
     if type(v) == "number" then
       v = U.Str(v)
     end
     return U.Color(K().C.good, v)
-  end -- good value (whole token)
-  -- exact number, rounded up (costs, E6); large numbers in the short form, also rounded up
+  end
   function exactUp(n)
     if n >= 1e6 then
       return U.ShortUp(n)
     end
     return U.Exact(math.ceil(n - 1e-7))
   end
-  -- r3 P1: the whole gain token, `muted` when it is "<1%", else `good`
   function gainTok(p)
     local c = K().C.good
     if U.GainLow(p) then
@@ -83,8 +74,6 @@ do
   end
   T.Title = title
   T.Line = line
-  -- Port v1: WoW starts with every Mrgl Squad binding unbound (Bindings.xml), so the key hint shows the player's own
-  -- binding, or nothing (the browser showed its default keys Q/B/E/1-4).
   T.KeyLine = function(tt, binding)
     local k = GetBindingKey(binding)
     if k == nil or k == "" then return end
@@ -93,7 +82,6 @@ do
   T.Double = double
   T.ExactUp = exactUp
   T.GainToken = gainTok
-  -- ------------------------------------------------------------ head
   T.Stage = function(tt)
     local db = Mrgl.db
     local Cb = Core().Combat
@@ -107,13 +95,12 @@ do
         line(tt, U.Fill(S().STAGE_GATE, { boss = w(Core().Boss.NextEnemy().name) }))
       end
     end
-    -- New Tide S/T/D: the New Tide count, in Blackwing Lair the trophy hint (before the first win) and "coming later"
     if db.prestige.count >= 1 then
       line(tt, U.Fill(S().STAGE_TIDE, { n = db.prestige.count }), K().C.muted)
     end
-    T.StageRares(tt, Cb.Zone(db.stage)) -- enemies1 G8: before the BWL lines
+    T.StageRares(tt, Cb.Zone(db.stage))
     local rc = T.RareCount()
-    line(tt, U.Fill(S().STAGE_RARES, { n = U.At(rc, 1), max = U.At(rc, 2) }), K().C.muted) -- enemies1b F5
+    line(tt, U.Fill(S().STAGE_RARES, { n = U.At(rc, 1), max = U.At(rc, 2) }), K().C.muted)
     if Cb.Zone(db.stage).id == "blackwing" then
       if db.prestige.trophies.nef ~= true then
         line(tt, S().NEF_STAGE_TIP, K().C.muted)
@@ -121,7 +108,6 @@ do
       line(tt, S().STAGE_COMING, K().C.muted)
     end
   end
-  -- enemies1 G8 (O3): "Rare: {name}" per rare of the zone, white once killed (stats.rareSeen "zoneId:i,..."), muted before
   T.StageRares = function(tt, z)
     if z.rares == nil then
       return
@@ -139,8 +125,6 @@ do
       line(tt, U.Fill(S().STAGE_RARE, { name = U.At(z.rares, i).name }), c)
     end
   end
-  -- enemies1b F5: {seen, all} over the zones of the own route reached so far (highest stage ever, so a New Tide keeps
-  -- them; Blackwing Lair once stage 101 was reached). Seen = "zoneId:i" in stats.rareSeen.
   T.RareCount = function()
     local db, Cb = Mrgl.db, Core().Combat
     local seen = db.stats.rareSeen
@@ -168,11 +152,9 @@ do
     line(tt, U.Exact(Mrgl.db.gold), K().C.white)
     line(tt, U.Fill(S().GOLD_RATE, { rate = w(U.Exact(Core().Shop.GoldRate())) }), K().C.tipText, true)
   end
-  -- ------------------------------------------------------------ enemy (r2 T4)
-  -- Level within the zone: zone min + floor((pos - 1) * (max - min) / 9). Zone level text is "min–max".
   T.EnemyLevel = function(s)
     local lv = Core().Combat.Zone(s).level
-    local DASH = "–"   -- 3 bytes in UTF-8
+    local DASH = "–"
     local dash = string.find(lv, DASH, 1, true)
     if dash == nil then
       return lv
@@ -197,14 +179,13 @@ do
       lvlTpl = S().ENEMY_LEVEL_RARE
       rare = true
     elseif e.kind == "normal" and e.rank ~= nil and e.rank >= 5 then
-      lvlTpl = S().ENEMY_LEVEL_ELITE -- enemies1 G3 (O2)
+      lvlTpl = S().ENEMY_LEVEL_ELITE
     end
     title(tt, e.name, c)
     line(tt, U.Fill(lvlTpl, { lvl = T.EnemyLevel(db.stage) }))
     if e.type ~= nil then
       line(tt, e.type, K().C.muted)
-    end -- enemies1 G4: King Mrgl-Mrgl "Humanoid (murloc costume)"
-    -- enemies1b F6: current and max rounded the same way (up), so a fresh enemy shows current = max
+    end
     local mx = math.ceil(F().EnemyHP(db.stage))
     local hp = math.max(0, math.ceil(db.enemyHp))
     line(tt, U.Fill(S().ENEMY_HEALTH, { hp = w(U.Exact(hp)), max = w(U.Exact(mx)) }))
@@ -217,7 +198,6 @@ do
     line(tt, S().ENEMY_CLICK_GOLD, K().C.tipText, true)
     line(tt, S().ENEMY_CLICK, K().C.muted)
   end
-  -- ------------------------------------------------------------ boss button (r2 T4, B4, B5)
   T.BossButton = function(tt)
     local db = Mrgl.db
     local Bo = Core().Boss
@@ -226,8 +206,8 @@ do
     title(tt, e.name, K().C.boss)
     if e.type ~= nil then
       line(tt, e.type, K().C.muted)
-    end -- enemies1 G4
-    local strength = U.Fill(S().BOSS_STRENGTH, { pct = w(U.Share(Bo.Strength())) }) -- r3 P2
+    end
+    local strength = U.Fill(S().BOSS_STRENGTH, { pct = w(U.Share(Bo.Strength())) })
     local r = Bo.Ready()
     if not Core().Combat.GateOpen() then
       line(tt, U.Fill(S().BOSS_TEASER, { s = w(bs) }))
@@ -241,7 +221,6 @@ do
     elseif r == "green" then
       line(tt, S().BOSS_GREEN, K().C.good, true)
     elseif r == "greenAbil" then
-      -- r3 G3
       local gs = S().BOSS_GREEN_ABIL_OFF
       if Mrgl.db.settings.opener == true then
         gs = S().BOSS_GREEN_ABIL
@@ -256,7 +235,7 @@ do
     line(tt, strength)
     T.NextJump(tt, r)
     if db.boss.lostStage == bs and db.boss.lostAt > 0 then
-      line(tt, U.Fill(S().BOSS_LOST_AT, { hp = w(U.Share(db.boss.lostAt)) })) -- r3 P2
+      line(tt, U.Fill(S().BOSS_LOST_AT, { hp = w(U.Share(db.boss.lostAt)) }))
     end
     local a = Bo.AutoState()
     if r == "green" and not held then
@@ -268,7 +247,6 @@ do
         line(tt, S().BOSS_CLICK, K().C.muted)
       end
     elseif r == "greenAbil" and not held then
-      -- the status line already says "Click to fight."
     elseif held then
       line(tt, S().BOSS_CLICK, K().C.muted)
     else
@@ -279,8 +257,6 @@ do
     end
     T.KeyLine(tt, "MRGLSQUAD_BOSS")
   end
-  -- r4 E15: "Next: {item} · +{n}% strength." names the purchase with the biggest jump in readiness
-  -- (Shop.NextJump: all candidates within 15 min of income, >= 5 points). Not when the colour is green.
   T.NextJump = function(tt, r)
     if r == "green" or r == "greenAbil" then
       return
@@ -295,13 +271,11 @@ do
     end
     line(tt, U.Fill(S().BOSS_NEXT, { item = item, gain = U.Color(K().C.good, U.Gain(j.pct)) }), K().C.muted, true)
   end
-  -- ------------------------------------------------------------ squad
   T.Portrait = function(tt, i)
     local m = F().Murloc(i)
     local n = Mrgl.db.murlocs[m.id].n
     title(tt, m.name, K().MurlocColor(i))
     if n <= 0 then
-      -- not hired yet (r2 V2): what it will do and what it costs, no "0 hired"
       line(tt, S().PORTRAIT_NONE, K().C.muted)
       line(tt, U.Fill(S().MURLOC_EACH, { each = w(U.Exact(F().MurlocEach(Mrgl.db.murlocs, i))) }), K().C.tipText, true)
       line(tt, U.Fill(S().PORTRAIT_COST, { cost = w(U.Exact(math.ceil(Mrgl.Core.Shop.Price(i, 1)))) }), K().C.tipText)
@@ -309,7 +283,6 @@ do
     end
     line(tt, U.Fill(S().PORTRAIT_LINE, { n = w(U.Exact(n)), dps = w(U.Exact(F().MurlocDPS(Mrgl.db.murlocs, i))) }))
   end
-  -- teaser = not hired yet (r2 V4: all six are rows)
   T.Murloc = function(tt, i, amount, teaser)
     local db = Mrgl.db
     local m = F().Murloc(i)
@@ -323,15 +296,13 @@ do
       local pct = "0%"
       if squad > 0 then
         pct = U.Share(total / squad)
-      end -- r3 P1: a share, rounded down
+      end
       line(tt, U.Fill(S().MURLOC_TOTAL, { n = w(U.Exact(n)), total = w(U.Exact(total)), pct = w(pct) }), K().C.tipText, true)
       line(tt, U.Fill(S().MURLOC_NEXT, { m = w(F().NextMilestone(n)) }))
     end
     line(tt, U.Fill(S().COST, { cost = costTok(Core().Shop.Price(i, amount)) }))
     line(tt, U.Fill(S().MURLOC_CLICK, { amount = amount }), K().C.muted)
   end
-  -- ------------------------------------------------------------ upgrades (j1 U: the next upgrade of a murloc row)
-  -- UPG_OF with the plain tier number ("Murloc Raider upgrade 2"), the effect, the cost, then the action or the condition
   function upgEffect(m, up)
     if up.special ~= nil then
       return up.text
@@ -361,11 +332,10 @@ do
       line(tt, U.Fill(S().UPG_NEEDS_PREV, { upgrade = w(U.At(m.upgrades, tier - 1).name) }), K().C.tipText, true)
     end
   end
-  -- all three bought: the murloc, "Complete", then each upgrade with its short effect
   T.UpgradeDone = function(tt, i)
     local m = F().Murloc(i)
     title(tt, m.name)
-    line(tt, S().UPG_COMPLETE, K().C.muted) -- j1c U1 (UX-A 2): grey like the tab, gold means "selected"
+    line(tt, S().UPG_COMPLETE, K().C.muted)
     for t = 1, U.Len(m.upgrades) do
       local up = U.At(m.upgrades, t)
       local fx = S().UPG_EFFECT_DOUBLE
@@ -375,7 +345,6 @@ do
       double(tt, up.name, fx, K().C.good)
     end
   end
-  -- ------------------------------------------------------------ self (r2 V5, T4)
   T.SelfValueText = function(id, r)
     local v = Core().Shop.SelfValue(id, r)
     if id == "click" then
@@ -386,8 +355,6 @@ do
     end
     return U.Fill(S().SELF_PCT_VAL, { v = v })
   end
-  -- % gain of effective damage for one more rank at the measured click speed (same as Buy best).
-  -- Returns -1 without a click rate.
   T.SelfGain = function(id)
     local db = Mrgl.db
     local c = Core().Shop.ClickFactor()
@@ -429,10 +396,8 @@ do
       line(tt, U.Fill(S().SELF_GAIN, { gain = gainTok(gain) }), K().C.tipText, true)
     end
     line(tt, U.Fill(S().COST, { cost = costTok(F().SelfCost(d.id, r)) }))
-    line(tt, S().UPG_CLICK, K().C.muted) -- r3 U3: like the murloc rows
+    line(tt, S().UPG_CLICK, K().C.muted)
   end
-  -- ------------------------------------------------------------ abilities
-  -- New Tide N (Spells 50): slot 1 looks like Anyfin Can Happen (name, icon and text from Data.Abilities alt)
   T.AbilityAlt = function(i)
     local d = U.At(Mrgl.Data.Abilities, i)
     if d.alt == nil or Mrgl.UI.Main.AnyfinShown == nil or not Mrgl.UI.Main.AnyfinShown() then
@@ -466,7 +431,6 @@ do
     end
     T.KeyLine(tt, "MRGLSQUAD_ABILITY" .. A.Slot(d.id))
   end
-  -- ------------------------------------------------------------ buy best (r2 E1, E2, E3)
   T.TargetName = function(t)
     if t.kind == "hire" then
       local m = F().Murloc(t.slot)
@@ -490,12 +454,11 @@ do
     end
     local t = ch.first
     if not ch.affordable or ch.n <= 0 then
-      -- nothing affordable yet: one target with its wait
       double(tt, T.TargetName(t), exactUp(t.cost))
       local tpl1 = S().BUYBEST_GAIN
       if ch.isNew == true then
         tpl1 = S().BUYBEST_NEW_GAIN
-      end -- r3 E8
+      end
       line(tt, U.Fill(tpl1, { gain = gainTok(t.gain), cost = w(exactUp(t.cost)) }), K().C.tipText, true)
       local wt = "-"
       if t.wait >= 0 then
@@ -518,7 +481,6 @@ do
     if n > shown then
       line(tt, U.Fill(S().BUYBEST_MORE, { m = n - shown }), K().C.muted)
     end
-    -- r3 E8: a new rank says so; the chain gain stands only here, not on the button
     local tpl = S().BUYBEST_GAIN
     if ch.isNew == true then
       tpl = S().BUYBEST_NEW_GAIN
@@ -526,7 +488,6 @@ do
     line(tt, U.Fill(tpl, { gain = gainTok(ch.gain), cost = w(exactUp(ch.cost)) }), K().C.tipText, true)
     T.KeyLine(tt, "MRGLSQUAD_BUYBEST")
   end
-  -- ------------------------------------------------------------ simple ones
   T.Simple = function(titleText, text, muted)
     return function(tt)
       title(tt, titleText)
@@ -541,7 +502,6 @@ do
   T.StatDPS = function(tt)
     title(tt, S().STAT_DPS)
     line(tt, U.Fill(S().STAT_DPS_LINE, { dps = w(U.Exact(Core().Combat.SquadDPS())) }))
-    -- tide1b T1/T6: Murky's share (0 before the first New Tide: no line)
     local mk = Core().Tide.MurkyDPS()
     if mk > 0 then
       line(tt, U.Fill(S().TIDE_MURKY_DPS, { dps = w(U.Exact(mk)) }), K().C.muted)
@@ -554,8 +514,6 @@ do
     local p = math.floor(Core().Combat.CritChance("click") * 100 + 0.5)
     line(tt, U.Fill(S().STAT_CRIT_LINE, { chance = w(p), mult = w(U.Dec(F().CritMult(db.self), 1)) }))
   end
-  -- ------------------------------------------------------------ New Tide (ngplus-plan R, Q, H, K, T)
-  -- Factors come from Core.Tide; the UI only formats them (U.Short: under 10 one decimal, from 1000 the short form).
   local TIDE_EFF = { m = "TIDE_EFFECT_M", s = "TIDE_EFFECT_S", a = "TIDE_EFFECT_A" }
   T.TideMult = function(id)
     local Td = Core().Tide
@@ -570,7 +528,6 @@ do
   T.TideEffect = function(id)
     return U.Fill(S()[TIDE_EFF[id]], { x = U.Short(T.TideMult(id)) })
   end
-  -- R3 milestone k of path i: "reached", "off" (reached, its toggle off), "next" (the first not reached) or "later"
   T.TideMsState = function(i, k)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     local d = U.At(p.ms, k)
@@ -590,7 +547,6 @@ do
     end
     return "later"
   end
-  -- the next milestone of path i, nil when all are reached
   T.TideNextMs = function(i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     local n = Mrgl.db.prestige.paths[p.id]
@@ -617,12 +573,11 @@ do
       line(tt, S().TIDE_ALL_MS, K().C.muted)
     end
   end
-  -- R3 path: name, points, per point, now, next milestone; the recommendation while no New Tide was made
   T.TidePath = function(tt, i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     local n = Mrgl.db.prestige.paths[p.id]
     title(tt, p.name)
-    line(tt, p.tag, K().C.muted) -- tide1c C4
+    line(tt, p.tag, K().C.muted)
     T.TideSpellsNeed(tt, p)
     if n == 1 then
       line(tt, S().TIDE_POINT)
@@ -638,7 +593,6 @@ do
       line(tt, S().TIDE_RECOMMENDED, K().C.gold, true)
     end
   end
-  -- R3 milestone: name, text, then reached / its switch / "At 25 points. You have 9."
   T.TideMs = function(tt, i, k)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     local d = U.At(p.ms, k)
@@ -655,7 +609,6 @@ do
     end
     line(tt, S().TIDE_MS_REACHED, K().C.good)
   end
-  -- R2 Quartermaster (first New Tide)
   T.TideFirst = function(tt, j)
     local d = U.At(Mrgl.Data.Tide.first, j)
     title(tt, d.name)
@@ -668,7 +621,6 @@ do
       toggleLine(tt, d.toggle)
     end
   end
-  -- T: Head of Nefarian, grey (need) or won (done), always "Just for show."
   T.TideTrophy = function(tt, j)
     local d = U.At(Mrgl.Data.Tide.trophies, j)
     title(tt, d.name)
@@ -679,14 +631,12 @@ do
     end
     line(tt, S().NEF_SHOW, K().C.muted)
   end
-  -- S: the TideFlood tooltip
   T.TideFlood = function(tt)
     local Td = Core().Tide
     title(tt, S().TIDE_FLOOD_TITLE)
-    line(tt, U.Fill(S().TIDE_FLOOD_ANY, { d = U.Short(Td.FloodDmg()), g = U.Short(Td.FloodGold()) }), K().C.good, true) -- tide1b T2
+    line(tt, U.Fill(S().TIDE_FLOOD_ANY, { d = U.Short(Td.FloodDmg()), g = U.Short(Td.FloodGold()) }), K().C.good, true)
     line(tt, U.Fill(S().TIDE_COUNT, { n = Mrgl.db.prestige.count }), K().C.muted)
   end
-  -- R2 TideBtn: what it does, and why not yet
   T.TideButton = function(tt)
     title(tt, S().TAB_TIDE)
     line(tt, S().TIDE_BTN_TIP, K().C.tipText, true)
@@ -696,25 +646,21 @@ do
     end
     if Core().rt.inCombat ~= true and not Mrgl.db.boss.active and not Td.Avail() then
       line(tt, U.Fill(S().TIDE_REACH_TIP, { s = Mrgl.Data.Balance.TIDE_STAGE }), K().C.muted, true)
-      line(tt, S().TIDE_NO_KILL, K().C.muted) -- tide1b T6
+      line(tt, S().TIDE_NO_KILL, K().C.muted)
     else
       line(tt, Mrgl.UI.Panel.TideReason().text, K().C.muted)
     end
   end
-  -- H
   T.TideMark = function(tt)
     title(tt, S().TIDE_MARK)
-    line(tt, S().TIDE_NO_KILL, K().C.tipText) -- tide1b T6: reaching Ragnaros is enough
+    line(tt, S().TIDE_NO_KILL, K().C.tipText)
     line(tt, S().TIDE_MARK_TIP, K().C.muted)
   end
-  -- tide1b T6: the tab-4 head icon
   T.TideHead = function(tt)
     title(tt, S().TAB_TIDE)
     line(tt, S().TAB_TIDE_TIP, K().C.tipText, true)
     line(tt, S().TIDE_NO_KILL, K().C.muted)
   end
-  -- tide1b T4: Ahn'Qiraj, Naxxramas (grey, right of the trophy)
-  -- tide1c C11: the deepest stage (tab-4 head)
   T.TideBest = function(tt)
     title(tt, S().TIDE_BEST_TITLE)
     line(tt, U.Fill(S().TIDE_BEST_TIP, { s = w(Mrgl.db.prestige.best) }), K().C.tipText, true)
@@ -723,7 +669,6 @@ do
     title(tt, U.At(Mrgl.Data.Tide.coming, j).name)
     line(tt, S().TIDE_COMING_TIP, K().C.muted)
   end
-  -- K: companion slot idx (1 Murky, 2 Tidecaller, 3 King Bagurgle): its data entry and whether it is there
   T.TideCompanion = function(idx)
     local D = Mrgl.Data.Tide
     local Td = Core().Tide
@@ -744,14 +689,12 @@ do
     end
     return nil
   end
-  -- K: name and text (tide1c C14: no quotes)
   T.Companion = function(tt, idx)
     local c = T.TideCompanion(idx)
     if c == nil then
       return
     end
     title(tt, c.d.name)
-    -- tide1d D4 / enemies1 N1: Murky = name + "Fights along: {dps} per second." (same value as the squad tooltip line)
     if idx == 1 then
       local mk = Core().Tide.MurkyDPS()
       if mk > 0 then
@@ -761,16 +704,14 @@ do
     end
     line(tt, c.d.text, K().C.tipText, true)
   end
-  -- Q: a path icon in the popup: name, per point, next milestone
   T.TidePick = function(tt, i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     title(tt, p.name)
-    line(tt, p.tag, K().C.muted) -- tide1c C4
+    line(tt, p.tag, K().C.muted)
     T.TideSpellsNeed(tt, p)
     line(tt, p.per, K().C.tipText, true)
     nextLine(tt, i)
   end
-  -- tide1d D4: Spells before War Drums (its first milestone, 10): the abilities only fire at a boss with you there
   T.TideSpellsNeed = function(tt, p)
     if p.id ~= "a" or Mrgl.db.prestige.paths.a >= U.At(p.ms, 1).at then
       return

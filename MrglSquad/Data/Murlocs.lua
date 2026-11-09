@@ -1,7 +1,5 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - 6 murlocs, 3 upgrades each (plan 4.2). Literal tables only.
 Mrgl.Data = Mrgl.Data or {}
-
 Mrgl.Data.Murlocs = {
   { id = "tinyfin", name = "Murloc Tinyfin", icon = "INV_Misc_Head_Murloc_01", tint = {1, 1, 1}, natural = true, badge = "", ring = {0.45, 0.85, 0.80}, cost = 10, dps = 1,
     upgrades = {
@@ -40,6 +38,4 @@ Mrgl.Data.Murlocs = {
       { name = "Legend of the Coast", cost = 10000000, special = "murk",
         text = "Old Murk-Eye deals 1% more damage for every murloc you have hired.", sub = "+1% per murloc" } } }
 }
-
--- Prepared for later (not in MVP): guest workers, prestige. Kept empty on purpose.
 Mrgl.Data.Guests = {}

@@ -1,8 +1,4 @@
 local ADDON, Mrgl = ...
--- Mrgl Squad - UI/Panel.lua equivalent: shop panel MrglSquadPanel (264 x 304) with 3 tabs (plan 3.3, r2 V3-V5, S1).
--- Squad: all 6 murlocs as rows (V4). Upgrades: one row per murloc with its next upgrade (j1 U). Self: all 4 lines (V5).
--- Settings is a page inside the panel (S1, built in Popup.lua because of the browser-only faction switch).
--- Kit pseudo-objects (K.Border, K.MurlocHead) are called with a colon.
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, F, Tips, Po, backdrop, lockBorder, glowBorder, setGlow, buildStat, buildRow, buildUpgradeParts, retry, setSettings, hireAmount, selfLocked, upgState, anyAffordable, bestMark, isBest, resetRow, setCost, fillSquad, fillSelf, fillUpgrade, bestLine
@@ -30,21 +26,17 @@ do
   end
   local w = {}
   P.w = w
-  local tw = { seen = false } -- New Tide tab widgets and state (one table: upvalue limits)
+  local tw = { seen = false }
   P.tw = tw
   local side = "right"
   local ROWS = 6
-  local TABS = 4 -- New Tide R1: squad, upgrades, self, New Tide
-  local LOCK_A = 0.25 -- r2 R6: border `line` at alpha 0.25 around locked / teaser elements
+  local TABS = 4
+  local LOCK_A = 0.25
   local settingsOpen = false
-  -- r3 W14: reanchor state. A hidden window only marks the need; OnShow of the main frame catches up.
   local needReanchor = false
   local retryPending = false
   local retries = 0
   local RETRY_MAX = 3
-  -- r2 R1: tooltip border (BackdropTemplate). j1 P1: the backdrop carries only the edge (no bgFile, no
-  -- SetBackdropColor, which a later SetBackdrop would reset to white); the background is an own opaque texture
-  -- (BACKGROUND -8, under the edge pieces at -7) inside the insets. Returns that texture.
   function backdrop(f, c)
     local I = Mrgl.Data.Icons
     f:SetBackdrop({ edgeFile = I.TOOLTIP_BORDER, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -67,7 +59,7 @@ do
     g:SetAllPoints(frame)
     K().Border(g, C().gold, "OVERLAY")
     g:Hide()
-    g.pulse = K().Pulse(g, 0.5, 0.4)   -- j1 #14: 0 -> 0.5 in 0.4 s, then still
+    g.pulse = K().Pulse(g, 0.5, 0.4)
     return g
   end
   function setGlow(g, on)
@@ -86,8 +78,8 @@ do
     w.frame = f
     f:SetSize(264, 304)
     f:EnableMouse(true)
-    Mrgl.UI.Main.Drag(f) -- j1 #13: the panel drags the window
-    w.bg = backdrop(f, C().panel) -- j1 P1: panel colour, alpha 1
+    Mrgl.UI.Main.Drag(f)
+    w.bg = backdrop(f, C().panel)
     w.zone = f:CreateTexture(nil, "BORDER")
     w.zone:SetPoint("TOPLEFT", f, "TOPLEFT", 3, -3)
     w.zone:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -3)
@@ -96,7 +88,6 @@ do
     w.openMove1 = K().AddMove(w.openAnim, -8, 0, 0, 0, 1)
     w.openMove2 = K().AddMove(w.openAnim, 8, 0, 0.15, 0, 2, "OUT")
     K().AddAlpha(w.openAnim, 0, 1, 0.15, 0, 2, "OUT")
-    -- tabs (24 x 24: nothing closer than 4 px to the border, R1). New Tide R1: tab 4 at x 92, always there
     local tabIcons = { Mrgl.Data.Icons.tabSquad, Mrgl.Data.Icons.tabUpgrades, Mrgl.Data.Icons.tabSelf, Mrgl.Data.Tide.icon }
     local tabTips = { { S.TAB_SQUAD, S.TAB_SQUAD_TIP }, { S.TAB_UPGRADES, S.TAB_UPGRADES_TIP }, { S.TAB_SELF, S.TAB_SELF_TIP }, { S.TAB_TIDE, S.TAB_TIDE_TIP } }
     w.tabs = {  }
@@ -116,7 +107,6 @@ do
       end)
       U.Insert(w.tabs, t)
     end
-    -- buy mode (squad tab only)
     local modeText = { S.MODE_X1, S.MODE_NEXT, S.MODE_MAX }
     local modeTips = { S.MODE_X1_TIP, S.MODE_NEXT_TIP, S.MODE_MAX_TIP }
     w.modes = {  }
@@ -148,13 +138,11 @@ do
     sep:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -30)
     sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -30)
     K().SetColor(sep, C().line)
-    -- rows (squad, upgrades, self)
     w.rows = {  }
     for r = 1, ROWS do
       U.Insert(w.rows, buildRow(f, r))
     end
-    buildTide(f) -- New Tide R2/R3: tab 4
-    -- footer
+    buildTide(f)
     local fsep = f:CreateTexture(nil, "ARTWORK")
     fsep:SetHeight(1)
     fsep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 4, 34)
@@ -167,7 +155,7 @@ do
       Tips().StatClick(tt)
     end)
     w.settings = K().IconButton(f, "MrglSquadSettingsButton", 20, Mrgl.Data.Icons.gear)
-    w.settings:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 7) -- j2 A3: in the right corner
+    w.settings:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 7)
     w.settings.border = K().Border(w.settings, C().gold, "OVERLAY")
     w.settings.border:SetShown(false)
     K().Tip(w.settings, Tips().Simple(S.SETTINGS))
@@ -181,7 +169,7 @@ do
         retries = 0
         P.Reanchor()
       end
-    end) -- r3 W14
+    end)
     P.Reanchor()
     return f
   end
@@ -197,13 +185,11 @@ do
     K().Tip(b, tip)
     return b
   end
-  -- Row r: squad tab = murloc r (all six, V4), upgrade tab = next upgrade of murloc r (j1 U), self tab = self line r (1-4)
   function buildRow(f, r)
     local b = CreateFrame("Button", "MrglSquadRow" .. r, f)
     b:SetSize(248, 36)
     b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -34 - (r - 1) * 38)
     b.hl = K().Highlight(b)
-    -- icon box 32 x 32: plain icon (self) or the tinted murloc head (M1)
     b.ic = CreateFrame("Frame", nil, b)
     b.ic:SetSize(32, 32)
     b.ic:SetPoint("LEFT", b, "LEFT", 2, 0)
@@ -230,9 +216,8 @@ do
     b.bar = CreateFrame("StatusBar", nil, b)
     b.bar:SetAllPoints(b.barBg)
     b.bar:SetStatusBarTexture(Mrgl.Data.Icons.WHITE)
-    b.bar:SetStatusBarColor(U.At(C().gold, 1), U.At(C().gold, 2), U.At(C().gold, 3), 0.7) -- r2 R2
+    b.bar:SetStatusBarColor(U.At(C().gold, 1), U.At(C().gold, 2), U.At(C().gold, 3), 0.7)
     b.bar:SetMinMaxValues(0, 1)
-    -- r2 R4: count and cost on the centre line
     b.count = K().Text(b, K().ARIALN, 16, C().white, "OUTLINE")
     b.count:SetPoint("RIGHT", b, "RIGHT", -84, 0)
     b.count:SetJustifyH("RIGHT")
@@ -253,7 +238,7 @@ do
     b.flash:SetBlendMode("ADD")
     b.flash:SetAlpha(0)
     b.flashAnim = b.flash:CreateAnimationGroup()
-    K().AddAlpha(b.flashAnim, 0.25, 0, 0.5, 0, 1, "OUT")   -- j1 #26
+    K().AddAlpha(b.flashAnim, 0.25, 0, 0.5, 0, 1, "OUT")
     b.index = r
     b:SetScript("OnClick", function(self)
       P.ClickRow(self.index)
@@ -264,9 +249,6 @@ do
     b:Hide()
     return b
   end
-  -- j1 U: the upgrade-tab parts of a row (variant a: one row per murloc, its next upgrade). Shown only on tab 2.
-  -- Name FRIZ 12 at x 40 / y +6; below it 3 pips 6 x 6 (gap 3, bought = `muted` fill, open = `line` ring) and the effect;
-  -- right: the price (setCost, like Squad) or one condition in ARIALN 11 `muted`.
   function buildUpgradeParts(b)
     b.upg = CreateFrame("Frame", nil, b)
     b.upg:SetAllPoints(b)
@@ -278,7 +260,7 @@ do
       local pip = CreateFrame("Frame", nil, b.upg)
       pip:SetSize(6, 6)
       pip:SetPoint("LEFT", b, "LEFT", 40 + (p - 1) * 9, -8)
-      pip.fill = K().Fill(pip, C().muted, "ARTWORK") -- j1b U1: gold means "selected"; a bought pip is muted grey
+      pip.fill = K().Fill(pip, C().muted, "ARTWORK")
       pip.ring = K().Border(pip, C().line, "ARTWORK")
       U.Insert(b.pips, pip)
     end
@@ -290,7 +272,6 @@ do
     b.cond:SetJustifyH("RIGHT")
     b.upg:Hide()
   end
-  -- ------------------------------------------------------------ open / close / anchor
   function retry()
     retryPending = false
     P.Reanchor()
@@ -300,7 +281,6 @@ do
     if f == nil then
       return
     end
-    -- r3 W14: hidden window -> no timer, OnShow catches up
     if not main:IsVisible() then
       needReanchor = true
       return
@@ -308,9 +288,8 @@ do
     if Mrgl.UI.Main.IsMoving() then
       needReanchor = true
       return
-    end -- j1 #13: DragStop reanchors once
+    end
     if main:GetRight() == nil then
-      -- W3: shown but not laid out yet, at most RETRY_MAX frames
       needReanchor = true
       if not retryPending and retries < RETRY_MAX then
         retries = retries + 1
@@ -321,11 +300,9 @@ do
     end
     needReanchor = false
     retries = 0
-    -- compare in UIParent units (GetScreenWidth is UIParent space)
     local sc = main:GetEffectiveScale() / UIParent:GetEffectiveScale()
     local right = main:GetRight() * sc
     f:ClearAllPoints()
-    -- j1 P3: dock left when less than 268 px are free on the right (264 panel + margin)
     if GetScreenWidth() - right < 268 * sc then
       side = "left"
       f:SetPoint("TOPRIGHT", main, "TOPLEFT", 1, 0)
@@ -337,7 +314,7 @@ do
   P.IsOpen = function()
     return w.frame:IsShown()
   end
-  P.Frame = function() -- j5 K3: the New Tide popup covers it
+  P.Frame = function()
     return w.frame
   end
   P.Show = function(on, quiet)
@@ -346,7 +323,7 @@ do
     Mrgl.UI.Main.SetChevron(on)
     if on and Mrgl.UI.Main.IsMinimized() then
       return
-    end -- j1 M2: stays closed while minimized, the wish is kept
+    end
     if on then
       P.Reanchor()
       w.frame:Show()
@@ -362,28 +339,27 @@ do
       P.Refresh()
     else
       setSettings(false)
-      tideLeave() -- New Tide R1: closing the panel leaves tab 4
+      tideLeave()
       w.frame:Hide()
     end
   end
   P.Toggle = function()
     if not Mrgl.UI.Main.w.expand:IsShown() or Mrgl.UI.Main.IsMinimized() then
       return
-    end -- j1 M2
+    end
     P.Show(not w.frame:IsShown())
   end
   P.SetTab = function(i)
     if i ~= 4 then
       tideLeave()
-    end -- New Tide R1: leaving tab 4 clears what was new
+    end
     Mrgl.db.settings.tab = i
     setSettings(false)
     P.Refresh()
   end
   P.NextTab = function()
-    P.SetTab(Mrgl.db.settings.tab % TABS + 1) -- nonneg
+    P.SetTab(Mrgl.db.settings.tab % TABS + 1)
   end
-  -- ------------------------------------------------------------ settings page (r2 S1)
   function setSettings(on)
     if on then
       tideLeave()
@@ -425,15 +401,12 @@ do
   P.RefreshSettings = function()
     Po().RefreshSettings()
   end
-  -- ------------------------------------------------------------ helpers
   function hireAmount(i)
     return Core().Shop.Amount(i, Mrgl.db.settings.mode)
   end
   function selfLocked(id)
     return not Core().Shop.SelfVisible(id)
   end
-  -- j1 U: state of murloc i's next upgrade: "done" (all three bought), "nohire" (none hired),
-  -- "locked" (fewer hired than its requirement), "buy" (unlocked; affordable or not)
   function upgState(i)
     local e = Mrgl.db.murlocs[F().Murloc(i).id]
     if e.u >= 3 then
@@ -488,7 +461,6 @@ do
     end
     return false
   end
-  -- r2 E5: the glow marks the first purchase of the Buy best chain; k = how often that item is in the chain
   function bestMark()
     if Mrgl.UI.Juice == nil or Mrgl.UI.Juice.GlowOwner() ~= "buy" then
       return nil
@@ -524,7 +496,6 @@ do
     end
     return true
   end
-  -- ------------------------------------------------------------ refresh
   P.Refresh = function()
     if w.frame == nil or not w.frame:IsShown() then
       return
@@ -584,7 +555,6 @@ do
     w.statDps.text:SetText(U.Short(Core().Combat.SquadDPS()))
     w.statClick.text:SetText(U.Short(Core().Combat.ClickDamage()))
     local tint = Core().Combat.Zone(db.stage).tint
-    -- j1 B2: tint colour at 0.28 in the texture, the gradient only fades the alpha (never a white area)
     w.zone:SetColorTexture(U.At(tint, 1), U.At(tint, 2), U.At(tint, 3), 0.28)
     w.zone:SetGradient("VERTICAL", CreateColor(1, 1, 1, 0), CreateColor(1, 1, 1, 1))
   end
@@ -597,7 +567,6 @@ do
     b.coin:Show()
     b.ic:SetAlpha(1)
     b.lock:SetShown(false)
-    -- j1 U: back from the upgrade look (32-px icon box, name, full alpha, hover)
     b.ic:SetSize(32, 32)
     b.name:Show()
     b.upg:Hide()
@@ -612,7 +581,6 @@ do
       K().SetTextColor(fs, C().bad)
     end
   end
-  -- r2 V4: every murloc is a row; not hired = dim head (alpha 0.55), name, cost, count 0
   function fillSquad(b, i, mark)
     local db = Mrgl.db
     local mu = F().Murloc(i)
@@ -621,7 +589,7 @@ do
     b.icon:Hide()
     b.headF:Show()
     b.name:SetText(mu.name)
-    K().SetTextColor(b.name, C().text) -- r2 R2: hired names in `text`, not gold
+    K().SetTextColor(b.name, C().text)
     b.count:SetText(U.Str(n))
     local lo = F().PrevMilestone(n); local hi = F().NextMilestone(n)
     b.barBg:Show()
@@ -643,7 +611,6 @@ do
     setCost(b.cost, Core().Shop.Price(i, k))
     setGlow(b.glowFrame, isBest(mark, "hire", i))
   end
-  -- r2 V5: all 4 self lines; crit lines before stage 10 dim (alpha 0.4) with "Stage 10" instead of the cost
   function fillSelf(b, j, mark)
     local db = Mrgl.db
     local S = Mrgl.Data.Strings
@@ -673,7 +640,7 @@ do
       return
     end
     b.icon:SetDesaturated(false)
-    K().SetTextColor(b.name, C().text) -- r2 R2
+    K().SetTextColor(b.name, C().text)
     K().SetTextColor(b.count, C().white)
     if F().SelfMaxed(d.id, r) then
       b.cost:SetText(S.MAX)
@@ -681,7 +648,6 @@ do
       b.coin:Hide()
     else
       setCost(b.cost, F().SelfCost(d.id, r))
-      -- r3 U4: dead weight (gain "<1%" at the measured click speed) shows its price muted instead of white
       local gain = Tips().SelfGain(d.id)
       if gain >= 0 and U.GainLow(gain) and F().SelfCost(d.id, r) <= db.gold then
         K().SetTextColor(b.cost, C().muted)
@@ -689,8 +655,6 @@ do
     end
     setGlow(b.glowFrame, isBest(mark, "self", j))
   end
-  -- j1 U: one row per murloc with its next upgrade (variant a). Exactly one thing on the right: the price (white or
-  -- `bad`, with coin), "{n}/{req} hired", "Hire first" (row alpha 0.35) or nothing when complete (row alpha 0.6).
   function fillUpgrade(b, i, mark)
     local S = Mrgl.Data.Strings
     local mu = F().Murloc(i)
@@ -718,7 +682,6 @@ do
     b.lock:SetShown(st == "locked" or st == "nohire")
     b.hl:SetShown(st == "buy")
     if st == "done" then
-      -- j1b U1 (UX-A S2): "Complete" in muted grey, not gold (gold = selected); row alpha 0.85 keeps it readable
       b.uName:SetText(S.UPG_COMPLETE)
       K().SetTextColor(b.uName, C().muted)
       b.uFx:SetText("")
@@ -751,16 +714,11 @@ do
     end
     setGlow(b.glowFrame, st == "buy" and isBest(mark, "upgrade", i, t))
   end
-  -- ------------------------------------------------------------ New Tide tab (ngplus-plan R, H, T): tab 4, content 248 wide
-  -- Head y -34..-80 (R2), three path rows of 56 px at y -84 / -144 / -204 (R3). Nothing stores a position: all hangs on
-  -- the panel (J A1). Locked = desaturated at alpha 0.45; reached = colour with a gold edge; "new" (rt.tideNew) fades its
-  -- gold edge in once in 0.4 s and then stands still until tab 4 is left. Alpha only, no motion. Factors come from Core.Tide.
   local TIDE_LOCK = 0.45
-  local TIDE_PER = { m = "TIDE_PT_M", s = "TIDE_PT_S", a = "TIDE_PT_A" } -- j5 K2: the short "+50%/pt"
+  local TIDE_PER = { m = "TIDE_PT_M", s = "TIDE_PT_S", a = "TIDE_PT_A" }
   function Ti()
     return Mrgl.Core.Tide
   end
-  -- rt.tideNew: milestone ids, "first" and "nef" not seen yet (lives in the core runtime, so a new db or /reload clears it)
   function tideNew()
     local rt = Core().rt
     if rt.tideNew == nil then
@@ -788,12 +746,10 @@ do
     end
     return false
   end
-  -- R1: the tab dot: New Tide available (not in a boss fight), or something new not seen yet
   function tideDot()
     return (Ti().Avail() and not Mrgl.db.boss.active) or anyNew()
   end
   P.TideDot = tideDot
-  -- R1: opened and left again (other tab, settings page, panel closed) -> what was new is seen
   function tideLeave()
     if not tw.seen then
       return
@@ -801,8 +757,6 @@ do
     tw.seen = false
     Core().rt.tideNew = {}
   end
-  -- a framed icon: black fill (the 1-px frame), icon inside with the row crop, a 1-px edge, and the "new" edge on its own
-  -- frame (0 -> 1 in 0.4 s, then still)
   function tideBox(parent, name, size, icon, button)
     local kind = "Frame"
     if button == true then
@@ -833,7 +787,6 @@ do
       b.newF:Hide()
     end
   end
-  -- R2: locked = grey at 0.45 with a `line` edge; free and on = colour, gold edge; free and off = grey, gold edge at 0.5
   function lockLook(b, have, on, isNew)
     if not have then
       b.icon:SetDesaturated(true)
@@ -856,14 +809,12 @@ do
     local pg = CreateFrame("Frame", "MrglSquadTidePage", f)
     w.tide = pg
     pg:SetAllPoints(f)
-    -- R2 head: icon, the tide factors, Quartermaster and trophy, the button and its one-line reason
     tw.icon = tideBox(pg, "MrglSquadTideIcon", 28, D.icon)
     tw.icon:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -38)
     tw.icon.edge:SetShown(false)
     K().Tip(tw.icon, function(tt)
       Tips().TideHead(tt)
     end)
-    -- tide1c C11: the deepest stage of any tide (prestige.best), grey under the icon, after the first New Tide
     tw.best = CreateFrame("Frame", "MrglSquadTideBest", pg)
     tw.best:SetSize(28, 12)
     tw.best:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -67)
@@ -904,7 +855,6 @@ do
     K().Tip(tw.nef, function(tt)
       Tips().TideTrophy(tt, 1)
     end)
-    -- tide1b T4: Ahn'Qiraj and Naxxramas, grey 16 px right of the trophy (2 px apart), "Coming later."
     tw.coming = {}
     for j = 1, U.Len(D.coming) do
       local cb = tideBox(pg, "MrglSquadTideComing" .. j, 16, U.At(D.coming, j).icon)
@@ -918,7 +868,7 @@ do
     end
     local b = CreateFrame("Button", "MrglSquadTideButton", pg)
     tw.btn = b
-    b:SetSize(110, 24)   -- plan 120: the tide factors reach x 138 at x301 x151
+    b:SetSize(110, 24)
     b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -38)
     K().Fill(b, C().panel, "BACKGROUND")
     b.edge = K().Border(b, C().line, "BORDER")
@@ -933,25 +883,18 @@ do
       Tips().TideButton(tt)
     end)
     tw.next = K().Text(pg, K().ARIALN, 10, C().muted, "")
-    -- tide1b T4: no fixed width: the box is the text itself, so it ends right of Naxxramas (x 118)
     tw.next:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -66)
     tw.next:SetJustifyH("RIGHT")
     local sep = pg:CreateTexture(nil, "ARTWORK")
     sep:SetSize(248, 1)
     sep:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -80)
     K().SetColor(sep, C().line)
-    -- j5 K2: the three path columns
     tw.paths = {}
     for i = 1, U.Len(D.paths) do
       U.Insert(tw.paths, buildTidePath(pg, f, i))
     end
     pg:Hide()
   end
-  -- j5 K2 (Jan's mockup docs/tide-cols): three columns Murlocs | Self-Click | Spells, 82 px each at y -84..-264.
-  -- Per column top to bottom: path icon 24 (gold edge with points), name, points (grey at 0), bonus ("×n" green, at 0
-  -- "+50%/pt"...), then the milestones 10/25/50/100 as 20-px nodes on a vertical rail that fills gold up to the points
-  -- (interpolated between the nodes). The long texts are in the tooltips (column = TidePath, node = TideMs).
-  -- j5b P2: LOCK_NUM = a locked node's number: light grey (x the node's 0.7 = about text grey 0.6)
   local COL = { W = 82, H = 180, NODE = 20, GAP = 6, TRACK = -78, LOCK_NUM = { 0.85, 0.84, 0.80, 1 } }
   function buildTidePath(pg, f, i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
@@ -966,7 +909,7 @@ do
     end
     r.ic = tideBox(r, "MrglSquadTidePathIcon" .. i, 24, p.icon)
     r.ic:SetPoint("TOP", r, "TOP", 0, -4)
-    r.rec = K().Border(r.ic, C().gold, "OVERLAY", 0, 1, 1) -- R3: recommended first (Murlocs while Total() = 0), static
+    r.rec = K().Border(r.ic, C().gold, "OVERLAY", 0, 1, 1)
     r.rec:SetShown(false)
     r.name = K().Text(r, K().FRIZ, 11, C().text, "")
     r.name:SetPoint("TOP", r.ic, "BOTTOM", 0, -3)
@@ -978,12 +921,11 @@ do
     r.effect = K().Text(r, K().ARIALN, 10, C().good, "")
     r.effect:SetPoint("TOP", r.points, "BOTTOM", 0, -1)
     r.effect:SetJustifyH("CENTER")
-    -- the rail from the first node's centre to the last one's, 2 px wide, under the nodes; the gold fill from the top
     local len = (U.Len(p.ms) - 1) * (COL.NODE + COL.GAP)
     r.rail = r:CreateTexture(nil, "ARTWORK")
     r.rail:SetSize(2, len)
     r.rail:SetPoint("TOP", r, "TOP", 0, COL.TRACK - COL.NODE / 2)
-    r.rail:SetColorTexture(1, 1, 1, 0.18) -- j5b P3: the empty rail a bit more visible (line is 0.10), still far from gold
+    r.rail:SetColorTexture(1, 1, 1, 0.18)
     r.railLen = len
     r.fill = r:CreateTexture(nil, "ARTWORK", nil, 1)
     r.fill:SetWidth(2)
@@ -996,7 +938,7 @@ do
       local m = tideBox(r, "MrglSquadTideMs" .. i .. k, COL.NODE, d.icon, true)
       m:SetPoint("TOP", r, "TOP", 0, COL.TRACK - (k - 1) * (COL.NODE + COL.GAP))
       K().Highlight(m, m.icon, 0.15, true)
-      m.num = K().Text(m, K().ARIALN, 10, C().muted, "OUTLINE") -- right of the node (tide1c C9: 10 px)
+      m.num = K().Text(m, K().ARIALN, 10, C().muted, "OUTLINE")
       m.num:SetPoint("LEFT", m, "RIGHT", 3, 0)
       m.num:SetJustifyH("LEFT")
       m.num:SetText(U.Str(d.at))
@@ -1016,7 +958,6 @@ do
     end)
     return r
   end
-  -- R2: Ready. / Not during combat. / After the boss fight. / Reach Ragnaros (stage 100). (combat before boss before stage)
   function tideReason()
     local S = Mrgl.Data.Strings
     if Core().rt.inCombat == true then
@@ -1031,14 +972,13 @@ do
     return { text = S.TIDE_READY, c = C().good }
   end
   P.TideReason = tideReason
-  -- R4 phases: everything is read from Core.Tide and db.prestige on every refresh
   function fillTide()
     local db = Mrgl.db
     local S = Mrgl.Data.Strings
     local T = Ti()
     local total = T.Total()
     local nw = tideNew()
-    local grey = total <= 0 and not T.Avail() -- R2: grey before the first New Tide and before stage 100
+    local grey = total <= 0 and not T.Avail()
     tw.icon.icon:SetDesaturated(grey)
     if grey then
       tw.icon:SetAlpha(TIDE_LOCK)
@@ -1076,8 +1016,6 @@ do
       fillTidePath(U.At(tw.paths, i), i, total, nw)
     end
   end
-
-  -- j5 K2: points, the bonus ("×n", or "+50%/pt" at 0), node states and the gold rail up to the points
   function fillTidePath(r, i, total, nw)
     local S = Mrgl.Data.Strings
     local p = U.At(Mrgl.Data.Tide.paths, i)
@@ -1118,7 +1056,6 @@ do
       end
       tideNewEdge(m, nw[U.At(p.ms, k).id] == true)
     end
-    -- the fill: each of the 3 gaps between the nodes fills with the share of its points (10 -> 25 -> 50 -> 100)
     local segs, frac = U.Len(p.ms) - 1, 0
     for j = 2, U.Len(p.ms) do
       local lo, hi = U.At(p.ms, j - 1).at, U.At(p.ms, j).at
@@ -1132,9 +1069,8 @@ do
       r.fill:Hide()
     end
   end
-  -- R2/R3: a reached milestone with a toggle (s10, a10) or the Quartermaster after the first New Tide switches settings[key]
   P.TideToggle = function(key)
-    Ti().Toggle(key) -- core: flips settings[key] only when its milestone is reached, then SAVE
+    Ti().Toggle(key)
     Mrgl.UI.Main.Refresh()
   end
   P.TideMsClick = function(i, k)
@@ -1151,7 +1087,6 @@ do
     end
     P.TideToggle(U.At(Mrgl.Data.Tide.first, 1).toggle)
   end
-  -- R2: the button opens the popup (Q) only when New Tide is ready; otherwise it is not clickable (alpha 0.45)
   P.TideOpen = function()
     if not Ti().Ready() then
       return false
@@ -1159,7 +1094,6 @@ do
     Po().ShowTide()
     return true
   end
-  -- H: TideMark click: restore a minimized window first (it grows upward, j2 A1), then the panel with tab 4
   P.OpenTide = function()
     if Mrgl.UI.Main.IsMinimized() then
       Mrgl.UI.Main.SetMinimized(false)
@@ -1169,7 +1103,6 @@ do
       P.Show(true)
     end
   end
-  -- ------------------------------------------------------------ clicks and tooltips
   P.ClickRow = function(r)
     local tab = Mrgl.db.settings.tab
     local Sh = Core().Shop
@@ -1179,7 +1112,6 @@ do
     if tab == 1 then
       Sh.Hire(F().Murloc(r).id, hireAmount(r))
     elseif tab == 2 then
-      -- j1 U: only the unlocked next upgrade buys (Core checks the gold); complete / locked rows do nothing
       if upgState(r) ~= "buy" then
         return
       end
@@ -1198,7 +1130,6 @@ do
     if not isBest(mark, kind, slot, tier) then
       return
     end
-    -- r3 E8: "(×k)" only from 2
     local S = Mrgl.Data.Strings
     if mark.k >= 2 then
       Tips().Line(tt, U.Fill(S.PART_OF_BEST, { k = mark.k }), C().good)
@@ -1212,7 +1143,6 @@ do
       Tips().Murloc(tt, r, hireAmount(r), Core().Shop.Hired(r) <= 0)
       bestLine(tt, "hire", r)
     elseif tab == 2 then
-      -- j1 U: the next upgrade of murloc r
       local st = upgState(r)
       local t = Mrgl.db.murlocs[F().Murloc(r).id].u + 1
       if st == "done" then
