@@ -1,0 +1,251 @@
+local ADDON, Mrgl = ...
+-- Mrgl Squad - all game-facing English strings (plan 3.7, 4.5). {x} = placeholder, filled by Mrgl.U.Fill.
+Mrgl.Data = Mrgl.Data or {}
+
+Mrgl.Data.Strings = {
+  TITLE = "Murlocs Heroes Idle",
+  BINDING_HEADER = "Murlocs Heroes Idle",
+  BIND_HIT = "Hit",
+  BIND_ABILITY = "Ability {n}",
+  BIND_BUYBEST = "Buy best",
+  BIND_BOSS = "Fight boss",
+  BIND_PANEL = "Toggle shop",
+  BIND_TOGGLE = "Toggle window",
+
+  -- head
+  STAGE_TITLE = "Stage {s}",
+  STAGE_KILLS = "Kills: {k}/10",
+  STAGE_GATE = "Boss ready: {boss}",
+  STAGE_FIGHT = "Boss fight: {boss}",
+  BOSS_MARK = "Boss",
+  GOLD_TITLE = "Gold",
+  GOLD_RATE = "Squad earns about {rate} per second.",
+
+  -- enemy
+  ENEMY_LEVEL = "Level {lvl}",
+  ENEMY_LEVEL_BOSS = "Level {lvl} Boss",
+  ENEMY_LEVEL_RARE = "Level {lvl} Rare",
+  ENEMY_LEVEL_ELITE = "Level {lvl} Elite", -- enemies1 G3: normals 5 and 6 of a zone
+  STAGE_RARES = "Rares: {n}/{max}", -- enemies1b F5: stage tooltip, grey, the rares seen over the zones reached so far
+  STAGE_RARE = "Rare: {name}", -- enemies1 G8: stage tooltip, white once seen, muted before
+  ENEMY_HEALTH = "Health: {hp} / {max}",
+  ENEMY_GOLD = "Gold: {gold}",
+  ENEMY_GOLD_RARE = "Gold: {gold} (×{m})",
+  SAVECHECK = "Murlocs Heroes Idle: loaded {from} copy, saveSeq {seq}.",   -- r4 W21
+  ENEMY_CLICK_GOLD = "Your own clicks loot 2.5× gold.",
+  ENEMY_CLICK = "Click to attack.",
+
+  -- boss button
+  BOSS_TEASER = "Waits at stage {s}.",
+  BOSS_GREY = "Fight now? Your squad is not ready.",
+  BOSS_YELLOW = "Close fight. Clicks and abilities can win it.",
+  BOSS_GREEN = "Your squad wins this on its own.",
+  BOSS_GREEN_ABIL = "Your abilities win this. Click to fight.",
+  BOSS_GREEN_ABIL_OFF = "Your abilities win this. Use them, then fight.",
+  BOSS_HELD = "Lost last time. Waits for a stronger squad.",
+  BOSS_LOST_AT = "Lost last time at {hp} health.",
+  BOSS_STRENGTH = "Squad strength: {pct} of a sure win.",
+  BOSS_NEXT = "Next: {item} · {gain} strength.",   -- r4 E15
+  BOSS_NEXT_TO = "{name} to {m}",
+  BOSS_STATS = "Health: {hp} · Time: {t} sec",
+  BOSS_CLICK_LOSE = "Click to fight. Losing costs nothing.",
+  BOSS_AUTO_IN = "Starts by itself in {n} sec. Click to start now.",
+  BOSS_AUTO_WAIT = "Starts after combat.",
+  BOSS_CLICK = "Click to fight.",
+  BOSS_OPENER = "Opens with your ready abilities.",
+  BOSS_KEY = "Key: Q",
+
+  -- squad
+  PORTRAIT_LINE = "{n} hired · {dps} damage per second",
+  PORTRAIT_NONE = "Not hired yet.",
+  PORTRAIT_COST = "First one costs {cost} gold.",
+  MURLOC_EACH = "Each deals {each} damage per second.",
+  MURLOC_TOTAL = "Your {n} deal {total} ({pct} of your squad).",
+  MURLOC_NEXT = "Next ×2 at {m} hired.",
+  COST = "Cost: {cost}",
+  MURLOC_CLICK = "Click to hire {amount}.",
+
+  -- upgrades
+  UPG_OF = "{murloc} upgrade {tier}",
+  UPG_DOUBLE = "Doubles {murloc} damage.",
+  UPG_SUB_DOUBLE = "×2 DPS",
+  UPG_CLICK = "Click to buy.",
+  UPG_LOCKED = "Unlocks at {req} {murloc}. You have {n}.",
+  UPG_EMPTY = "Hire more murlocs.",
+  UPG_NEEDS_PREV = "Buy {upgrade} first.",
+  UPG_OWNED = "Owned.",
+  UPG_TIMES2 = "×2",
+
+  -- self
+  SELF_NOW = "Now: {value}",
+  SELF_NEXT = "Next: {next}",
+  SELF_MAXED = "Maxed out.",
+  SELF_CLICK_VAL = "+{v} dmg",
+  SELF_PCT_VAL = "{v}%",
+  SELF_MULT_VAL = "×{v}",
+  SELF_GAIN = "{gain} damage at your click speed.",
+  SELF_GAIN_NONE = "Attack for a few seconds to see its worth.",
+  SELF_LOCKED = "Unlocks at stage {s}.",
+  SELF_LOCKED_HIRE = "Unlocks with your first murloc.",
+  SELF_LOCK_STAGE = "Stage {s}",
+  SELF_LOCK_HIRE = "1st hire",
+
+  -- abilities
+  ABILITY_CD = "Cooldown: {cd}",
+  ABILITY_KEY = "Key: {key}",
+  ABILITY_READY_IN = "Ready in {t}",
+  ABILITY_ACTIVE = "Active: {t} left",
+  ABILITY_LOCKED = "Unlocks at stage {s}.",
+
+  -- buy best
+  BUYBEST = "Buy best",
+  BUYBEST_GAIN = "{gain} damage for {cost} gold.",
+  BUYBEST_NEW_GAIN = "New murloc · {gain} damage for {cost} gold.",
+  BUYBEST_MORE = "...and {m} more.", -- port p2: ASCII dots (U+2026 may be missing in FRIZQT__)
+  PART_OF_BEST = "Part of Buy best (×{k}).",
+  PART_OF_BEST_1 = "Part of Buy best.",
+  BUY_NEW = "New!",
+  NOTHING_WORTH = "Nothing worth buying right now.",
+  BUYBEST_WAIT = "Affordable in {t}.",
+  BUYBEST_KEY = "Key: B",
+  BUYBEST_AMOUNT = "{name} ×{n}",
+
+  -- panel
+  TAB_SQUAD = "Squad", TAB_SQUAD_TIP = "Hire murlocs. They fight for fish.",
+  TAB_UPGRADES = "Upgrades", TAB_UPGRADES_TIP = "Make your murlocs stronger.",
+  TAB_SELF = "Self", TAB_SELF_TIP = "Sharpen your own clicks.",
+  MODE_X1 = "x1", MODE_X1_TIP = "Buy one at a time.",
+  MODE_NEXT = "Next", MODE_NEXT_TIP = "Buy up to the next ×2 milestone.",
+  MODE_MAX = "Max", MODE_MAX_TIP = "Buy as many as you can afford.",
+  MAX = "MAX",
+  STAT_DPS = "Squad damage", STAT_DPS_LINE = "{dps} per second",
+  STAT_CLICK = "Click damage", STAT_CLICK_LINE = "{click} per click",
+  STAT_CRIT_LINE = "Crit: {chance}% for ×{mult}",
+  SETTINGS = "Settings",
+  SHOW_SHOP = "Show shop", HIDE_SHOP = "Hide shop", SHOP_KEY = "Key: E",
+  CLOSE = "Close", CLOSE_TIP = "Your squad keeps fighting.",
+
+  -- settings page (r2 S1)
+  SET_CALM = "Calm mode",
+  SET_CALM_TIP = "Fewer numbers and coins. Your squad stays still.",
+  SET_OPENER = "Boss opener",
+  SET_OPENER_TIP = "The boss button also fires your ready abilities.",
+  SET_AUTOFIGHT = "Auto-fight green bosses",
+  SET_AUTOFIGHT_TIP = "Bosses your squad beats on its own start by themselves. Never during combat. Yellow and grey bosses wait for you.",
+  SET_SCALE = "Scale",
+  SET_RESET_POS = "Reset position",
+  SET_ALLIANCE = "Alliance",
+  SET_HORDE = "Horde",
+  SET_FACTION_TIP = "Browser only. In WoW your character decides.",
+
+  -- popup
+  WELCOME = "Welcome back",
+  COLLECT = "Collect",
+  COLLECT_TIP = "Offline earnings: {pct}% for up to 8 hours.", -- New Tide S: pct = 50, or 75 with Murlocs 25
+  OFFLINE_COUNTED = "{h}h counted",
+
+  -- banners
+  RETREAT = "Retreat!",
+  DEFEATED = "{boss} defeated!",
+  RARE = "Rare!",
+  RARE_HEAD = "Rare!",
+  LEEROY_BANNER = "LEEEROY JENKINS!",
+  PLUS = "+{v}",
+  TIMES2 = "×2",
+  -- j1 U: upgrade tab, one row per murloc
+  UPG_EFFECT_DOUBLE = "×2 damage",
+  UPG_REQ = "{n}/{req} hired",
+  UPG_HIRE_FIRST = "Hire first",
+  UPG_COMPLETE = "Complete",
+  -- j1 G/W: the gold moment
+  BONUS_RARE = "Rare kill!",
+  BONUS_QUEST = "Quest complete!",
+  BONUS_QUESTS = "{n} quests complete!",
+  BONUS_LEVEL = "Level {n}!",
+  BONUS_LEVEL_1 = "Mrrrgl! The squad cheers.",
+  BONUS_LEVEL_2 = "Mrgl mrgl! Shiny!",
+  BONUS_LEVEL_3 = "Aaaaughibbrgubugbugrguburgle!",
+  BONUS_ZONE = "New zone!",
+  VICTORY = "Victory!", -- j1c M3: the boss title when "{boss} defeated!" does not fit next to the amount
+  -- j1 M: minimize
+  MINIMIZE = "Minimize",
+  RESTORE = "Restore",
+  -- j1 #12: minimap button (addon only)
+  MINIMAP_GOLD = "Gold: {gold}",
+  MINIMAP_CLICK = "Left: window · Right: minimize · Shift: settings",
+  SET_MINIMAP = "Minimap button",
+  SET_HIDE_COMBAT = "Hide in combat", -- j2 A2
+  PAUSED_COMBAT = "Paused in combat", -- j2 A2: a boss fight frozen by WoW combat (window visible)
+  MINIMAP_SHOWN = "Minimap button shown.",
+  MINIMAP_HIDDEN = "Minimap button hidden. /mrgl minimap shows it again.",
+  COMPARTMENT = "Murlocs Heroes Idle",
+  COMPARTMENT_TIP = "Click to show or hide the window.",
+  -- New Tide (ngplus-plan S). TIDE_POP_NEW: several names joined with " · "; TIDE_POP_RANK uses "to" (tide1b T6: no arrow)
+  TAB_TIDE = "New Tide",
+  TAB_TIDE_TIP = "Start over stronger. Every New Tide adds 1 point to a path.",
+  TIDE_FLOOD_X = "×{x}",
+  TIDE_FLOOD_TITLE = "The tide",
+  TIDE_FLOOD_ANY = "Every New Tide, any path: ×{d} murloc damage · ×{g} gold",
+  TIDE_NO_KILL = "Ragnaros does not have to fall.",
+  TIDE_COUNT = "New Tides: {n}",
+  TIDE_FIRST_LOCKED = "Unlocks with your first New Tide.",
+  TIDE_BUTTON = "New Tide +1",
+  TIDE_BUTTON_LOCKED = "New Tide",
+  TIDE_READY = "Ready.",
+  TIDE_REACH = "Reach Ragnaros (stage {s}).",
+  TIDE_REACH_TIP = "Reach Ragnaros (stage {s}) to start a New Tide.",
+  TIDE_AFTER_BOSS = "After the boss fight.",
+  TIDE_NO_COMBAT = "Not during combat.",
+  TIDE_BTN_TIP = "Back to stage 1. Add 1 point to a path.",
+  TIDE_POINT = "1 point",
+  TIDE_POINTS = "{n} points",
+  TIDE_NOW = "Path bonus: {effect}, on top of the tide.",
+  TIDE_PATH_BONUS = "Path bonus: {effect}",
+  TIDE_NEXT_MS = "Next: {name} at {r}.",
+  TIDE_ALL_MS = "All milestones reached.",
+  TIDE_EFFECT_M = "×{x} murloc damage",
+  TIDE_EFFECT_S = "×{x} click damage",
+  TIDE_EFFECT_A = "×{x} ability power",
+  TIDE_PER_M = "+50% per point",
+  TIDE_PER_S = "+100% per point",
+  TIDE_PER_A = "+200% per point",
+  TIDE_RECOMMENDED = "Recommended first: it helps most while you are away.",
+  TIDE_MS_AT = "At {r} points. You have {n}.",
+  TIDE_MS_REACHED = "Reached.",
+  TIDE_ON = "On. Click to switch off.",
+  TIDE_OFF = "Off. Click to switch on.",
+  TIDE_POP_TITLE = "New Tide",
+  TIDE_CHOOSE = "Add 1 point to a path:",
+  TIDE_POP_RANK = "{path} {old} to {new}",
+  TIDE_POP_NEW = "New: {name}",
+  TIDE_POP_NEXT = "Next: {name} at {r}",
+  TIDE_POP_FLOOD = "+100% murloc damage · +50% gold",
+  TIDE_KEEP = "Keep",
+  TIDE_RESET = "Reset",
+  TIDE_KEEP_POINTS = "Points, milestones and trophies",
+  TIDE_KEEP_ABIL = "Abilities stay unlocked",
+  TIDE_KEEP_SET = "Settings and stats",
+  TIDE_RESET_GOLD = "Gold",
+  TIDE_RESET_SQUAD = "Murlocs and upgrades",
+  TIDE_RESET_SELF = "Click Power, Echo and Crit",
+  TIDE_RESET_STAGE = "Back to stage 1",
+  TIDE_FOREVER = "Points stay in their path forever.",
+  TIDE_GO = "New Tide",
+  TIDE_CANCEL = "Not yet",
+  TIDE_HEAD = "New Tide · {path} {n}",
+  TIDE_JOIN = "{name} joins the squad.",
+  TIDE_MS_NEW = "{name} unlocked.",
+  TIDE_MARK = "New Tide ready",
+  TIDE_MARK_TIP = "Click to open.",
+  NEF_HEAD = "Trophy: Head of Nefarian",
+  NEF_SHOW = "Just for show.",
+  TIDE_COMING_TIP = "Coming later.",
+  TIDE_BEST_TITLE = "Deepest stage",
+  TIDE_BEST_TIP = "The deepest stage you reached in any tide: {s}.",
+  TIDE_MURKY_DPS = "Murky: {dps} per second", -- enemies1 N1: no flavour
+  TIDE_MURKY_FIGHTS = "Fights along: {dps} per second.", -- tide1d D4: Murky's companion tooltip
+  TIDE_SPELLS_BOSS = "Needs you at the boss until War Drums (10).", -- tide1d D4: Spells path below War Drums
+  NEF_STAGE_TIP = "Defeat Nefarian for a trophy.",
+  STAGE_TIDE = "New Tide {n}",
+  STAGE_COMING = "Ahn'Qiraj and Naxxramas: coming later."
+}

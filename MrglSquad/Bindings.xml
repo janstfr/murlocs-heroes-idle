@@ -1,0 +1,12 @@
+<Bindings>
+  <Binding name="MRGLSQUAD_HIT" header="MRGLSQUAD" category="ADDONS">MrglSquad_Hit()</Binding>
+  <Binding name="MRGLSQUAD_ABILITY1" category="ADDONS">MrglSquad_Ability(1)</Binding>
+  <Binding name="MRGLSQUAD_ABILITY2" category="ADDONS">MrglSquad_Ability(2)</Binding>
+  <Binding name="MRGLSQUAD_ABILITY3" category="ADDONS">MrglSquad_Ability(3)</Binding>
+  <Binding name="MRGLSQUAD_ABILITY4" category="ADDONS">MrglSquad_Ability(4)</Binding>
+  <Binding name="MRGLSQUAD_BUYBEST" category="ADDONS">MrglSquad_BuyBest()</Binding>
+  <Binding name="MRGLSQUAD_BOSS" category="ADDONS">MrglSquad_Boss()</Binding>
+  <Binding name="MRGLSQUAD_PANEL" category="ADDONS">MrglSquad_Panel()</Binding>
+  <Binding name="MRGLSQUAD_TOGGLE" category="ADDONS">MrglSquad_Toggle()</Binding>
+  <Binding name="MRGLSQUAD_MINIMIZE" category="ADDONS">MrglSquad_Minimize()</Binding>
+</Bindings>

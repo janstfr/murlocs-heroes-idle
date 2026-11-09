@@ -1,0 +1,35 @@
+## Interface: 16001
+## Title: Murlocs Heroes Idle
+## Notes: Murlocs Heroes Idle: an idle clicker with a murloc squad.
+## Version: 1.0.0
+## IconTexture: Interface\Icons\INV_Misc_Head_Murloc_01
+## AddonCompartmentFunc: MrglSquad_OnCompartmentClick
+## SavedVariables: MrglSquadDB
+## SavedVariablesPerCharacter: MrglSquadCharDB
+Data\Balance.lua
+Data\Murlocs.lua
+Data\Self.lua
+Data\Routes.lua
+Data\Tide.lua
+Data\Strings.lua
+Data\Icons.lua
+Core\Util.lua
+Core\Formula.lua
+Core\Events.lua
+Core\State.lua
+Core\Combat.lua
+Core\Boss.lua
+Core\Shop.lua
+Core\Abilities.lua
+Core\Tick.lua
+Core\World.lua
+Core\Tide.lua
+UI\Kit.lua
+UI\Tooltips.lua
+UI\Juice.lua
+UI\Main.lua
+UI\Panel.lua
+UI\Popup.lua
+UI\Bindings.lua
+UI\Minimap.lua
+Main.lua
