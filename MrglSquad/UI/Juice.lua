@@ -8,7 +8,7 @@ Mrgl.UI = Mrgl.UI or {}
 do
   local buyKey
   local quietIn
-  local K, C, Core, W, M, S, calm, visible, rush, laneColor, buildNumber, placeNumber, stopNumber, killNumber, number, laneLive, updateNumbers, fadeAllNumbers, fitText, utf8Head, beginHeadline, setReward, showHeadline, endHeadline, updateHeadline, clearHeadline, buildSpark, buildCoin, buildWhelp, ringFx, flashFx, flash, canPunch, punch, burst, coinFlight, coinsFlying, updateCoins, whelpFlight, chainReset, popPortrait, milestoneFx, silhouette, bossGlow, newAbility, bossRingColor
+  local K, C, Core, W, M, S, calm, visible, rush, laneColor, buildNumber, placeNumber, stopNumber, killNumber, number, laneLive, updateNumbers, fadeAllNumbers, fitText, utf8Head, beginHeadline, setReward, showHeadline, endHeadline, updateHeadline, clearHeadline, buildSpark, buildCoin, buildWhelp, ringFx, flashFx, flash, canPunch, punch, burst, coinFlight, coinsFlying, updateCoins, whelpFlight, chainReset, popPortrait, milestoneFx, silhouette, bossGlow, newAbility, bossRingColor, setNumberColor
   local J = {}
   Mrgl.UI.Juice = J
   local U = Mrgl.U
@@ -81,15 +81,15 @@ do
     f.pop = f:CreateAnimationGroup()
     f.popScale = K().AddScale(f.pop, l.pop, 1, 0.15, 0, 1, "OUT")
     f:Hide()
-    return { f = f, key = key, active = false, live = false, t = 0, k = 0, x = 0, dy = 0, born = 0, amount = 0 }
+    return { f = f, key = key, active = false, live = false, t = 0, fa = 0, k = 0, x = 0, dy = 0, born = 0, amount = 0, crit = false }
   end
   function placeNumber(r)
     local l = LANES[r.key]
     local p = math.min(1, r.t / l.dur)
     local y = l.y + r.dy + l.dist * (1 - (1 - p) * (1 - p))
-    local a = 1
-    if r.t > l.fade then
-      a = math.max(0, 1 - (r.t - l.fade) / (l.dur - l.fade))
+    local a = 1 -- j5 K1: the fade runs on its own clock (fa): an own click re-lights the R number, it does not move back
+    if r.fa > l.fade then
+      a = math.max(0, 1 - (r.fa - l.fade) / (l.dur - l.fade))
     end
     if not r.live then
       a = a * math.max(0, 1 - r.k / KILL_FADE)
@@ -116,8 +116,20 @@ do
     end
   end
   -- amount on a lane: bundles hits within BUNDLE seconds (calm: R one number per 0.3 s), keeps the lane cap
-  function number(key, amount)
-    if bossPause or not visible() then
+  -- j5 K1/K1+ (Jan: "bei jedem Klick soll auch feedback kommen, dass man angreift"): own = an own click. It shows in
+  -- the boss pause too, and on lane R a bundled click re-lights the number (alpha back to 1, no pop, no move).
+  -- j5 K5 (c): in fast mode a crit goes to lane R (small, beside the face, crit colour), so at most 2 numbers, none on
+  -- the face.
+  function setNumberColor(r, crit)
+    r.crit = crit
+    local c = laneColor(LANES[r.key])
+    if crit then
+      c = C().crit
+    end
+    K().SetTextColor(r.f.text, c)
+  end
+  function number(key, amount, own, crit)
+    if (bossPause and own ~= true) or not visible() then
       return
     end
     local l = LANES[key]
@@ -158,6 +170,12 @@ do
     if newest ~= nil and now - newest.born < win then
       newest.amount = newest.amount + amount
       newest.f.text:SetText(U.Short(newest.amount))
+      if key == "R" then -- j5 K1: re-light (the bundle stays where it is); a crit inside turns it crit-coloured
+        newest.fa = 0
+        if crit == true and not newest.crit then
+          setNumberColor(newest, true)
+        end
+      end
       if quietN then
         return
       end
@@ -236,9 +254,13 @@ do
     use.active = true
     use.live = true
     use.t = 0
+    use.fa = 0
     use.k = 0
     use.born = now
     use.amount = amount
+    if key == "R" or use.crit then
+      setNumberColor(use, key == "R" and crit == true)
+    end
     use.x = l.x
     use.dy = 0
     if key == "C" then
@@ -278,17 +300,22 @@ do
     return false
   end
   function updateNumbers(dt)
+    local fastNow = J.FastFarm()
     for n = 1, 4 do
       local pool = LANES[U.At(LANE_KEYS, n)].list
       for i = 1, U.Len(pool) do
         local r = U.At(pool, i)
         if r.active then
+          if fastNow and r.key == "C" and r.live then -- j5 K5 (c): fast mode: off the face
+            killNumber(r, KILL_FADE)
+          end
           local l = LANES[r.key]
           r.t = r.t + dt
+          r.fa = r.fa + dt
           if not r.live then
             r.k = r.k + dt
           end
-          if r.t >= l.dur or not r.live and r.k >= KILL_FADE then
+          if r.fa >= l.dur or not r.live and r.k >= KILL_FADE then
             stopNumber(r)
           else
             placeNumber(r)
@@ -1814,20 +1841,24 @@ do
     flash(0.10)
   end
   -- L2: a click stored during the respawn pause shows its number at once (lane R)
+  -- j5 K1+: every own click in the pause shows (also in the boss pause, and when the queue of CLICK_QUEUE is full: then
+  -- the number only shows the click, it is not queued)
   J.ManualClick = function()
-    if not visible() or bossPause then
+    if not visible() then
       return
     end
     local rt = Core().rt
     local db = Mrgl.db
-    if rt.respawn <= 0 or rt.queued >= Mrgl.Data.Balance.CLICK_QUEUE then
+    if rt.respawn <= 0 then
       return
     end
     if db.boss.active and rt.inCombat then
       return
     end
-    number("R", Core().Combat.ClickDamage())
-    shownQueued = shownQueued + 1
+    number("R", Core().Combat.ClickDamage(), true)
+    if rt.queued < Mrgl.Data.Balance.CLICK_QUEUE then
+      shownQueued = shownQueued + 1
+    end
   end
   -- j1 A1 #6: the one spark burst of the gold moment (J.Bonus may call J.Burst). n <= 8 sparks around anchor (+x, +y),
   -- 24 px out. j1 A3: none in calm mode; B: none with /mrgl debug fx sparks off
@@ -2091,7 +2122,7 @@ do
         if p.kind == "click" and skipHits > 0 then
           skipHits = skipHits - 1
         end
-        number("C", p.amount)
+        number("R", p.amount, p.kind == "click", true) -- j5 K5 (c), j5b P4: a crit is never on the face centre (side lane R)
         if not visible() or not ff.punchOk() then -- j4 H2 (b): not the killing hit, <= 1 per 0.6 s, none in fast mode
           return
         end
@@ -2108,7 +2139,7 @@ do
         skipHits = skipHits - 1
         return
       end -- shown when it was queued
-      number("R", p.amount)
+      number("R", p.amount, p.kind == "click")
     end)
     On("KILL", function(p)
       ff.kill(p.boss, p.click) -- tide1c C1: counted while hidden too (j4 H2: a boss is no lifetime)
@@ -2696,6 +2727,7 @@ do
     end
     db.enemyHp = 1
     Core().rt.respawn = 0
+    Core().rt.enemyAge = math.max(Core().rt.enemyAge, Mrgl.Data.Balance.MIN_LIFE) -- j5 K5: the debug win is at once
     M().Hit(true)
     return true
   end

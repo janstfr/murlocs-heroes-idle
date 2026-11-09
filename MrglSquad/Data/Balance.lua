@@ -12,6 +12,7 @@ Mrgl.Data.Balance = {
   BOSS_TIMER = 30,
   HP_BASE = 10, HP_GROWTH = 1.30, HP_LIN = 10,
   GOLD_LIN = 0.4, GOLD_DIV = 600, GOLD_PLUS = 1,   -- tuned with tools/balance.mjs (plan 0.5/120); j4 H3 (Jan 09.11.): 0.25/570 -> 0.4/600, more gold at stages 16-35 (review/economy/gold-feel.md)
+  MIN_LIFE = 0.8,   -- j5 K5 (Jan: "man sieht halt keine Leben mehr"): no enemy dies before it lived this long (s), see Combat.Damage
   RESPAWN = 0.15,   -- j1 T1 (was 0.3; GOLD_DIV 540 -> 570 balances the pace)
   BOSS_RESPAWN = 1.0,         -- j1 T1 (was 1.75); the headline keeps running over the new enemy
   ADVANCE_MAX = 3600,         -- catch-up simulates at most 1 h, longer sleeps pay offline gold

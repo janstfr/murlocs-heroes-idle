@@ -343,6 +343,7 @@ do
     db.kills = 0
     db.maxStage = 1
     db.enemyHp = F().EnemyHP(1)
+    Mrgl.Core.Combat.NewLife() -- j5 K5
     db.enemyRare = false
     db.rareStage = 0
     local bo = db.boss

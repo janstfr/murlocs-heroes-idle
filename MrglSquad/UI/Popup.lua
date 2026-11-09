@@ -5,7 +5,7 @@ local ADDON, Mrgl = ...
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, Tips, Panel, readinessColor, rowY, toggleRow, textButton, label, screenPos
-  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill
+  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill, tideCover
   local Po = {}
   Mrgl.UI.Popup = Po
   local U = Mrgl.U
@@ -27,7 +27,7 @@ do
   local w = {}
   Po.w = w
   -- New Tide Q: the tide popup's widgets and state (declared here: Po.IsOpen reads it)
-  local tp = { open = false, path = "m", picks = {}, keep = {}, reset = {}, inC = false } -- tide1b T6: inC = combat look shown
+  local tp = { open = false, path = "m", picks = {}, keep = {}, reset = {}, inC = false, cover = "", lw = 0 } -- tide1b T6: inC = combat look shown
   Po.tp = tp
   local roll = { from = 0, to = 0, t = 1 }
   local POP_H = 168; local POP_H_NOGATE = 140 -- r3 F3: without a gate (no boss icon) the popup is shorter
@@ -200,8 +200,12 @@ do
   -- one column, icons aligned), the forever line is at y -186 and the popup is 232 high (TIDE_POP_H).
   -- tide1c C4: a muted tag (ARIALN 10, 2 lines of 62 px: tag + tag2) under every path: the picks are 64 apart and everything
   -- under them moves down 12 px (popup 244 high)
-  local TIDE_POP_H, TIDE_KEEP_Y, TIDE_RESET_Y, TIDE_FOREVER_Y = 244, -156, -176, -198
-  local TIDE_PICK_X = { -64, 0, 64 }
+  -- j5 K3 (Jan: "die ganze Fenstergröße nehmen, damit nicht alles so klein ist"): the popup covers the whole addon
+  -- window, the main frame plus the open panel (panel closed: the main frame), re-anchored when the panel opens or
+  -- closes while it is up (tideCover). Same content and order, larger: path icons 48 (was 32), every text one size up,
+  -- the content centred in the popup. The dimmer, Esc, Not yet, the double-click guard and the alpha-only fade stay.
+  local TIDE_KEEP_Y, TIDE_RESET_Y, TIDE_FOREVER_Y = -200, -222, -248
+  local TIDE_PICK_X, TIDE_PICK = { -76, 0, 76 }, 48
   local TIDE_KEEP = { { "", "TIDE_KEEP_POINTS" }, { "Ability_Warrior_BattleShout", "TIDE_KEEP_ABIL" }, { "INV_Misc_Gear_01", "TIDE_KEEP_SET" } }
   local TIDE_RESET = { { "INV_Misc_Coin_01", "TIDE_RESET_GOLD" }, { "INV_Misc_Head_Murloc_01", "TIDE_RESET_SQUAD" },
     { "INV_Gauntlets_04", "TIDE_RESET_SELF" }, { "INV_Misc_Bone_HumanSkull_01", "TIDE_RESET_STAGE" } }
@@ -247,9 +251,9 @@ do
     dim:Hide()
     local p = CreateFrame("Frame", "MrglSquadTide", dim, "BackdropTemplate")
     tp.popup = p
+    tp.main = main
     p:Hide() -- shown only while open: WoW's Esc (CloseSpecialWindows) checks IsShown, not IsVisible
-    p:SetSize(200, TIDE_POP_H)
-    p:SetPoint("CENTER", main, "CENTER", 0, 0)
+    p:SetAllPoints(main) -- j5 K3: tideCover sets the real cover on open
     p:EnableMouse(true)
     Panel().Backdrop(p, C().panel)
     tp.popIn = p:CreateAnimationGroup()
@@ -259,16 +263,35 @@ do
     p:SetScript("OnHide", function()
       Po.TideCancel()
     end)
-    local title = K().Text(p, K().FRIZ, 13, C().gold, "OUTLINE")
-    title:SetPoint("TOP", p, "TOP", 0, -10)
+    -- j5b P5: a small static X top right (the window's X is under the popup): exactly like Not yet; muted, white on hover
+    local x = CreateFrame("Button", "MrglSquadTideClose", p)
+    tp.x = x
+    x:SetSize(14, 14)
+    x:SetPoint("TOPRIGHT", p, "TOPRIGHT", -6, -6)
+    x.tex = x:CreateTexture(nil, "ARTWORK")
+    x.tex:SetTexture(K().Media(Mrgl.Data.Icons.close))
+    x.tex:SetAllPoints(x)
+    K().SetVertex(x.tex, C().muted)
+    x:SetScript("OnEnter", function()
+      K().SetVertex(x.tex, C().white)
+    end)
+    x:SetScript("OnLeave", function()
+      K().SetVertex(x.tex, C().muted)
+    end)
+    K().Tip(x, Tips().Simple(S.TIDE_CANCEL))
+    x:SetScript("OnClick", function()
+      Po.TideCancel()
+    end)
+    local title = K().Text(p, K().FRIZ, 14, C().gold, "OUTLINE")
+    title:SetPoint("TOP", p, "TOP", 0, -12)
     title:SetJustifyH("CENTER")
     title:SetText(S.TIDE_POP_TITLE)
-    tideText(p, 11, C().muted, -30, S.TIDE_CHOOSE)
+    tideText(p, 12, C().muted, -34, S.TIDE_CHOOSE)
     for i = 1, U.Len(D.paths) do
       local d = U.At(D.paths, i)
       local b = CreateFrame("Button", "MrglSquadTidePick" .. i, p)
-      b:SetSize(32, 32)
-      b:SetPoint("TOP", p, "TOP", U.At(TIDE_PICK_X, i), -46)
+      b:SetSize(TIDE_PICK, TIDE_PICK)
+      b:SetPoint("TOP", p, "TOP", U.At(TIDE_PICK_X, i), -54)
       K().Fill(b, C().black, "BACKGROUND")
       b.icon = K().Icon(b, d.icon, "ARTWORK")
       b.icon:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
@@ -284,12 +307,12 @@ do
       K().Tip(b, function(tt, self)
         Tips().TidePick(tt, self.index)
       end)
-      b.tag = K().Text(p, K().ARIALN, 10, C().muted, "") -- tide1c C4: Best while away / clicking / at bosses
-      b.tag:SetWidth(62)
+      b.tag = K().Text(p, K().ARIALN, 11, C().muted, "") -- tide1c C4: Best while away / clicking / at bosses
+      b.tag:SetWidth(74)
       b.tag:SetPoint("TOP", b, "BOTTOM", 0, -2)
       b.tag:SetJustifyH("CENTER")
-      b.tag2 = K().Text(p, K().ARIALN, 10, C().muted, "") -- fontstrings never wrap (K.Text): the last word goes on line 2
-      b.tag2:SetWidth(62)
+      b.tag2 = K().Text(p, K().ARIALN, 11, C().muted, "") -- fontstrings never wrap (K.Text): the last word goes on line 2
+      b.tag2:SetWidth(74)
       b.tag2:SetPoint("TOP", b.tag, "BOTTOM", 0, 0)
       b.tag2:SetJustifyH("CENTER")
       local head, last = string.match(d.tag, "^(.*) (%S+)$")
@@ -297,26 +320,26 @@ do
       b.tag2:SetText(last or "")
       U.Insert(tp.picks, b)
     end
-    tp.rank = tideText(p, 13, C().text, -108)
-    tp.ms = tideText(p, 11, C().good, -124)
-    tideText(p, 11, C().good, -140, S.TIDE_POP_FLOOD)
-    tp.keepL = K().Text(p, K().ARIALN, 10, C().muted, "")
+    tp.rank = tideText(p, 14, C().text, -138)
+    tp.ms = tideText(p, 12, C().good, -158)
+    tideText(p, 12, C().good, -176, S.TIDE_POP_FLOOD)
+    tp.keepL = K().Text(p, K().ARIALN, 11, C().muted, "")
     tp.keepL:SetText(S.TIDE_KEEP)
-    tp.resetL = K().Text(p, K().ARIALN, 10, C().muted, "")
+    tp.resetL = K().Text(p, K().ARIALN, 11, C().muted, "")
     tp.resetL:SetText(S.TIDE_RESET)
     tp.keep = tideSmall(p, TIDE_KEEP, 1)
     tp.reset = tideSmall(p, TIDE_RESET, 0.7)
-    tp.forever = tideText(p, 10, C().muted, TIDE_FOREVER_Y)
+    tp.forever = tideText(p, 11, C().muted, TIDE_FOREVER_Y)
     local go = CreateFrame("Button", "MrglSquadTideGo", p)
     tp.go = go
-    go:SetSize(92, 22)
-    go:SetPoint("BOTTOM", p, "BOTTOM", -42, 8)
+    go:SetSize(100, 24)
+    go:SetPoint("BOTTOM", p, "BOTTOM", -46, 10)
     K().Fill(go, C().gold, "BACKGROUND")
     K().Highlight(go, go, 0.2)
     go.icon = K().Icon(go, U.At(D.paths, 1).icon, "ARTWORK")
-    go.icon:SetSize(14, 14)
+    go.icon:SetSize(16, 16)
     go.icon:SetPoint("LEFT", go, "LEFT", 5, 0)
-    go.text = K().Text(go, K().FRIZ, 12, C().dark, "")
+    go.text = K().Text(go, K().FRIZ, 13, C().dark, "")
     go.text:SetShadowOffset(0, 0)
     go.text:SetPoint("CENTER", go, "CENTER", 8, 0)
     go.text:SetJustifyH("CENTER")
@@ -325,12 +348,12 @@ do
       Po.TideGo()
     end)
     local no = CreateFrame("Button", "MrglSquadTideCancel", p)
-    no:SetSize(72, 22)
-    no:SetPoint("BOTTOM", p, "BOTTOM", 50, 8)
+    no:SetSize(80, 24)
+    no:SetPoint("BOTTOM", p, "BOTTOM", 54, 10)
     K().Fill(no, C().panel, "BACKGROUND")
     K().Border(no, C().line, "BORDER")
     K().Highlight(no)
-    local nt = K().Text(no, K().FRIZ, 12, C().text, "")
+    local nt = K().Text(no, K().FRIZ, 13, C().text, "")
     nt:SetPoint("CENTER", no, "CENTER", 0, 0)
     nt:SetJustifyH("CENTER")
     nt:SetText(S.TIDE_CANCEL)
@@ -347,21 +370,61 @@ do
       Po.TideRefresh()
     end)
   end
-  -- Keep: label + 3 icons (y -144), Reset: label + 4 icons (y -164); 16 x 16, 4 apart. The labels share one column from
-  -- x 16 (ARIALN 10 muted), the icons start 6 px after the wider label, so both rows line up.
+  -- Keep: label + 3 icons, Reset: label + 4 icons; 16 x 16, 4 apart. The labels share one column (ARIALN 11 muted), the
+  -- icons start 6 px after the wider label, so both rows line up; j5 K3: the block is centred in the popup (from TOP)
   function tideRow(label, list, y, x0)
     label:ClearAllPoints()
-    label:SetPoint("LEFT", tp.popup, "TOPLEFT", 16, y - 8)
+    label:SetPoint("LEFT", tp.popup, "TOP", x0, y - 8)
     for i = 1, U.Len(list) do
       local k = U.At(list, i)
       k:ClearAllPoints()
-      k:SetPoint("TOPLEFT", tp.popup, "TOPLEFT", x0 + (i - 1) * 20, y)
+      k:SetPoint("TOPLEFT", tp.popup, "TOP", x0 + tp.lw + 6 + (i - 1) * 20, y)
     end
   end
   function tideKeepLayout()
-    local x0 = 16 + math.ceil(math.max(tp.keepL:GetStringWidth(), tp.resetL:GetStringWidth())) + 6
+    tp.lw = math.ceil(math.max(tp.keepL:GetStringWidth(), tp.resetL:GetStringWidth()))
+    local x0 = -math.floor((tp.lw + 6 + U.Len(tp.reset) * 20 - 4) / 2)
     tideRow(tp.keepL, tp.keep, TIDE_KEEP_Y, x0)
     tideRow(tp.resetL, tp.reset, TIDE_RESET_Y, x0)
+  end
+  -- j5 K3: the popup covers the main frame plus the open panel (whichever side it docks on), else the main frame
+  function tideCover()
+    local main, pf = tp.main, Mrgl.UI.Panel.Frame()
+    local key = "main"
+    if pf:IsShown() then
+      key = "left"
+      if pf:GetLeft() > main:GetLeft() then
+        key = "right"
+      end
+    end
+    if key == tp.cover then
+      return
+    end
+    tp.cover = key
+    local p = tp.popup
+    p:ClearAllPoints()
+    if key == "left" then
+      p:SetPoint("TOPLEFT", pf, "TOPLEFT", 0, 0)
+      p:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", 0, 0)
+    elseif key == "right" then
+      p:SetPoint("TOPLEFT", main, "TOPLEFT", 0, 0)
+      p:SetPoint("BOTTOMRIGHT", pf, "BOTTOMRIGHT", 0, 0)
+    else
+      p:SetAllPoints(main)
+    end
+    -- j5b P1: with the panel the three paths spread over the width (thirds of main + panel), else 76 apart
+    local dx = 76
+    if key ~= "main" then
+      dx = math.floor((main:GetWidth() + pf:GetWidth() - 1) / 3)
+    end
+    for i = 1, U.Len(tp.picks) do
+      local b = U.At(tp.picks, i)
+      b:ClearAllPoints()
+      b:SetPoint("TOP", p, "TOP", (i - 2) * dx, -54)
+    end
+  end
+  Po.TideCover = function() -- tests
+    return tp.cover
   end
   function pathIndex(id)
     local paths = Mrgl.Data.Tide.paths
@@ -441,6 +504,8 @@ do
       tp.path = "m"
     end -- Q: the first New Tide recommends Murlocs
     tp.open = true
+    tp.cover = ""
+    tideCover()
     tideKeepLayout()
     tideFill()
     tp.popup:Show()
@@ -469,6 +534,7 @@ do
       Po.TideCancel()
       return
     end
+    tideCover() -- j5 K3: the panel opened or closed while the popup is up
     if (Core().rt.inCombat == true) ~= tp.inC then
       tideFill()
     end -- tide1b T6: only when combat starts or ends

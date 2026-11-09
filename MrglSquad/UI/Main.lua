@@ -550,7 +550,7 @@ do
     lv(e, 2)
     e:SetSize(88, 88)
     e:SetPoint("TOP", f, "TOP", 0, -50)
-    e:RegisterForClicks("LeftButtonDown")
+    e:RegisterForClicks("LeftButtonDown", "RightButtonDown") -- j5 K6 (Jan: "mit linksklick UND rechtsklick angreifen")
     K().Fill(e, C().black, "BACKGROUND")
     w.enemyBorder = K().Border(e, { 1, 1, 1, 0.25 }, "BORDER", 1)
     w.enemyIcon = K().Icon(e, nil, "ARTWORK")
@@ -1151,6 +1151,20 @@ do
     w.spot:SetAlpha(0.15)
   end
   M.SpotLook = spotLook
+  -- j5 K5 (b): a held enemy (rt.enemyBank > 0, Core MIN_LIFE) drains along its life floor. Between the 0.1-s core steps
+  -- the bar follows the floor at this frame (age + rt.acc), so the drain is smooth (width only, no flash).
+  M.HpShown = function(hp, max)
+    local rt, ml = Core().rt, Mrgl.Data.Balance.MIN_LIFE
+    local f = 0
+    if max > 0 then
+      f = hp / max
+    end
+    if rt.enemyBank ~= nil and rt.enemyBank > 0 and ml ~= nil and ml > 0 and rt.respawn <= 0
+      and not (Mrgl.db.boss.active and rt.inCombat) then
+      f = math.min(f, math.max(0, 1 - (rt.enemyAge + math.max(0, rt.acc)) / ml))
+    end
+    return f
+  end
   -- tide1d D2: in fast mode the picture (and the name with it) swaps at most once per LOOK_HOLD s;
   -- the HP bar and number stay live (Refresh). force: faction switch.
   -- enemies1b F4: a boss start swaps everything at once (picture, name, red colour, border, skull) and starts a new hold;
@@ -1380,10 +1394,7 @@ do
     if pause then
       hp = 0
     end
-    st.hpFrac = 0
-    if max > 0 then
-      st.hpFrac = hp / max
-    end
+    st.hpFrac = M.HpShown(hp, max)
     w.hp:SetValue(st.hpFrac)
     if pause then
       w.hpText:SetText("")
@@ -1983,6 +1994,11 @@ do
     if goldStr ~= st.goldStr then -- port p2 (review p1 WoW S3): SetText only on a change (every frame before)
       st.goldStr = goldStr
       w.goldText:SetText(goldStr)
+    end
+    -- j5 K5 (b): the drain of a held enemy moves every frame
+    if Core().rt.enemyBank ~= nil and Core().rt.enemyBank > 0 and Core().rt.respawn <= 0 then
+      st.hpFrac = M.HpShown(math.max(0, Mrgl.db.enemyHp), F().EnemyHP(Mrgl.db.stage))
+      w.hp:SetValue(st.hpFrac)
     end
     -- HP lag: waits 0.15 s, then follows with 0.35 s smoothing
     if st.hpFrac >= st.lag then

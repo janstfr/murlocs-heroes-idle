@@ -237,14 +237,13 @@ do
           db.stats.crits = db.stats.crits + 1
           cr = cr + 1
         end
-        db.enemyHp = db.enemyHp - d
+        Cb.Damage(d, 1, "whelp")
         sum = sum + d
         cnt = cnt + 1
         if db.enemyHp <= 0 then
-          db.enemyHp = 0
           C.Fire("HIT", { amount = sum, kind = "whelp", crit = false, bundle = cnt, crits = cr })
           sum, cnt, cr, dmg = 0, 0, 0, nil
-          Cb.Kill(1, "whelp")
+          Cb.Die(1, "whelp")
         end
       end
     end
@@ -255,6 +254,7 @@ do
   -- tide1c C6: catch-up only. Crits = k x chance rounded with one random draw: the right mean but almost no spread, fine
   -- for silent catch-up, not meant for online play (lua review tide1c K2). A kill takes the clicks it needs on average,
   -- the rest is queued as whelp hits like single clicks during the respawn. Same expected damage and gold.
+  -- j5 K5: a kill held by MIN_LIFE swallows the rest of the bundle (overkill, as online).
   Cb.WhelpQuiet = function(n)
     local db = Mrgl.db
     local rt = C.rt
@@ -273,35 +273,118 @@ do
         end
         return
       end
+      if rt.killSet == true then
+        return
+      end
       local dmg = Cb.ClickDamage()
       local cc = Cb.CritChance("whelp")
       local cm = F().CritMult(db.self)
       local avg = dmg * (1 + cc * (cm - 1))
       local k = left
       if avg > 0 then
-        k = math.min(left, math.max(1, math.ceil(db.enemyHp / avg)))
+        k = math.min(left, math.max(1, math.ceil((db.enemyHp - rt.enemyBank) / avg)))
       end
       local crits = math.min(k, math.floor(k * cc + U.Rand()))
       db.stats.crits = db.stats.crits + crits
-      db.enemyHp = db.enemyHp - ((k - crits) * dmg + crits * dmg * cm)
+      Cb.Damage((k - crits) * dmg + crits * dmg * cm, 1, "whelp")
       left = left - k
       if db.enemyHp <= 0 then
-        db.enemyHp = 0
-        Cb.Kill(1, "whelp")
+        Cb.Die(1, "whelp")
       end
     end
   end
+
+  -- ------------------------------------------------------------ j5 K5: minimum enemy lifetime (Balance.MIN_LIFE)
+  -- No enemy (normal, rare, boss) dies before it has lived MIN_LIFE seconds (rt.enemyAge: game time since its spawn,
+  -- advanced in Cb.Squad; the respawn pause and a frozen boss fight do not count). While age < MIN_LIFE the HP cannot go
+  -- below the floor max x (1 - age / MIN_LIFE); damage below it is held in rt.enemyBank and lands as the floor sinks, so a
+  -- one-shot enemy drains linearly and dies exactly at MIN_LIFE. HP above the floor is unaffected (slow enemies unchanged).
+  -- The hit that first brought the true remaining life (enemyHp - enemyBank) to 0 is the killer (rt.killSet/killGold/
+  -- killKind): its gold multiplier and kind go to Kill, so a held real click still pays the click-kill gold.
+  -- MIN_LIFE 0 = the old behaviour. Every hit still fires HIT with its full amount.
+  Cb.EnemyAge = function()
+    return C.rt.enemyAge
+  end
+  Cb.NewLife = function()
+    local rt = C.rt
+    rt.enemyAge = 0
+    rt.enemyBank = 0
+    rt.killSet = false
+    rt.killGold = 1
+    rt.killKind = nil
+  end
+  local function lifeFloor()
+    local ml = B().MIN_LIFE
+    local age = C.rt.enemyAge
+    if not (ml ~= nil and ml > 0) or age >= ml then
+      return 0
+    end
+    return F().EnemyHP(Mrgl.db.stage) * (1 - age / ml)
+  end
+  -- amount of damage on the current enemy, held below the floor; goldMult/kind of the hit (kind nil = squad)
+  Cb.Damage = function(amount, goldMult, kind)
+    local db = Mrgl.db
+    local rt = C.rt
+    local ml = B().MIN_LIFE
+    if rt.enemyBank == 0 and (not (ml ~= nil and ml > 0) or rt.enemyAge >= ml) then
+      db.enemyHp = db.enemyHp - amount
+      return
+    end
+    if rt.killSet ~= true and db.enemyHp - rt.enemyBank - amount <= 0 then
+      rt.killSet = true
+      rt.killGold = goldMult
+      rt.killKind = kind
+    end
+    local room = db.enemyHp - lifeFloor()
+    if room < 0 then
+      room = 0
+    end
+    if amount <= room then
+      db.enemyHp = db.enemyHp - amount
+    else
+      db.enemyHp = db.enemyHp - room
+      rt.enemyBank = rt.enemyBank + amount - room
+    end
+  end
+  -- held damage lands as far as the floor allows
+  local function release()
+    local db = Mrgl.db
+    local rt = C.rt
+    if not (rt.enemyBank > 0) then
+      return
+    end
+    local room = db.enemyHp - lifeFloor()
+    if room <= 0 then
+      return
+    end
+    local take = math.min(rt.enemyBank, room)
+    db.enemyHp = db.enemyHp - take
+    rt.enemyBank = rt.enemyBank - take
+  end
+  -- the enemy dies (HP <= 0): the recorded killer (held hit) or this hit pays
+  Cb.Die = function(goldMult, kind)
+    local rt = C.rt
+    local g, k = goldMult, kind
+    if rt.killSet == true then
+      g, k = rt.killGold, rt.killKind
+    end
+    Mrgl.db.enemyHp = 0
+    Cb.NewLife()
+    Cb.Kill(g, k)
+  end
+
   -- A hit on the current enemy. Returns true when it killed.
   Cb.Hit = function(amount, kind, crit, goldMult)
     local db = Mrgl.db
-    if C.rt.respawn > 0 then
+    local rt = C.rt
+    if rt.respawn > 0 then
       return false
     end
     -- New Tide C4: auto-click damage joins the squad number (1x/s), the UI shows no own number for kind "auto"
     if kind == "auto" then
-      C.rt.squadDealt = C.rt.squadDealt + math.min(amount, db.enemyHp)
+      rt.squadDealt = rt.squadDealt + math.min(amount, math.max(0, db.enemyHp - rt.enemyBank))
     end
-    db.enemyHp = db.enemyHp - amount
+    Cb.Damage(amount, goldMult, kind)
     if crit then
       db.stats.crits = db.stats.crits + 1
     end
@@ -311,12 +394,12 @@ do
       C.Fire("CRIT", p)
     end
     if db.enemyHp <= 0 then
-      db.enemyHp = 0
-      Cb.Kill(goldMult, kind)
+      Cb.Die(goldMult, kind)
       return true
     end
     return false
   end
+
   -- Brings the next enemy in at once (abilities never hit air).
   Cb.EnsureEnemy = function()
     -- queued clicks are dropped here: they could kill the fresh enemy before the ability lands
@@ -326,11 +409,14 @@ do
       Cb.Spawn()
     end
   end
+
   -- Squad damage over dt seconds, exact across kills and the respawn pause (no overkill carry).
+  -- j5 K5: also the clock of the enemy age; the enemy dies at max(time the damage needs, MIN_LIFE - age).
   Cb.Squad = function(dt)
     local db = Mrgl.db
     local rt = C.rt
     local d = Cb.SquadDPS()
+    local ml = B().MIN_LIFE
     local t = dt
     local guard = 0
     while t > 1e-9 and guard < 1000 do
@@ -343,7 +429,8 @@ do
           rt.respawn = 0
           Cb.Spawn()
         end
-      else
+      elseif rt.enemyBank == 0 and (not (ml ~= nil and ml > 0) or rt.enemyAge >= ml) then
+        -- grown-up enemy, nothing held: as before MIN_LIFE
         if not (d > 0) then
           return
         end
@@ -353,12 +440,48 @@ do
         local need = db.enemyHp / d
         if need <= t then
           rt.squadDealt = rt.squadDealt + db.enemyHp
-          db.enemyHp = 0
           t = t - need
-          Cb.Kill(1)
+          Cb.Die(1, nil)
         else
           db.enemyHp = db.enemyHp - d * t
           rt.squadDealt = rt.squadDealt + d * t
+          t = 0
+        end
+      else
+        if db.boss.active and rt.inCombat then
+          return
+        end -- frozen: the age stands still too
+        local eff = db.enemyHp - rt.enemyBank -- true remaining life
+        local need2 = 0
+        if eff > 0 then
+          if d > 0 then
+            need2 = eff / d
+          else
+            need2 = math.huge
+          end
+        end
+        local tDie = math.max(need2, math.max(0, ml - rt.enemyAge))
+        if tDie <= t + 1e-9 then -- 1e-9: eight 0.1-s ticks sum to 0.7999999999999999
+          if eff > 0 then
+            rt.squadDealt = rt.squadDealt + eff
+          end
+          tDie = math.min(tDie, t)
+          rt.enemyAge = rt.enemyAge + tDie
+          t = t - tDie
+          Cb.Die(1, nil)
+        else
+          local dd = 0
+          if d > 0 then
+            dd = d * t
+          end
+          if dd > 0 then
+            rt.squadDealt = rt.squadDealt + math.min(dd, math.max(0, eff))
+          end
+          rt.enemyAge = rt.enemyAge + t
+          if dd > 0 then
+            Cb.Damage(dd, 1, nil)
+          end
+          release()
           t = 0
         end
       end
@@ -430,6 +553,7 @@ do
     local db = Mrgl.db
     local rt = C.rt
     db.enemyHp = F().EnemyHP(db.stage)
+    Cb.NewLife() -- j5 K5
     db.enemyRare = false
     if not F().IsBoss(db.stage) and db.rareStage ~= db.stage and U.Rand() < B().RARE_CHANCE then
       db.enemyRare = true

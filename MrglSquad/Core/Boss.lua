@@ -99,6 +99,7 @@ do
     db.boss.max = Bo.Timer()
     db.boss.time = db.boss.max
     db.enemyHp = F().EnemyHP(bs)
+    Cb().NewLife() -- j5 K5
     db.enemyRare = false
     rt.respawn = 0
     rt.queued = 0
@@ -186,6 +187,7 @@ do
     db.stage = db.stage - 1
     db.kills = B().KILLS_PER_STAGE
     db.enemyHp = F().EnemyHP(db.stage)
+    Cb().NewLife() -- j5 K5
     C.rt.gateFired = true
   end
   Bo.Step = function(dt)

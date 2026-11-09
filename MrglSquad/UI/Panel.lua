@@ -337,6 +337,9 @@ do
   P.IsOpen = function()
     return w.frame:IsShown()
   end
+  P.Frame = function() -- j5 K3: the New Tide popup covers it
+    return w.frame
+  end
   P.Show = function(on, quiet)
     local db = Mrgl.db
     db.settings.panel = on
@@ -753,7 +756,7 @@ do
   -- the panel (J A1). Locked = desaturated at alpha 0.45; reached = colour with a gold edge; "new" (rt.tideNew) fades its
   -- gold edge in once in 0.4 s and then stands still until tab 4 is left. Alpha only, no motion. Factors come from Core.Tide.
   local TIDE_LOCK = 0.45
-  local TIDE_PER = { m = "TIDE_PER_M", s = "TIDE_PER_S", a = "TIDE_PER_A" }
+  local TIDE_PER = { m = "TIDE_PT_M", s = "TIDE_PT_S", a = "TIDE_PT_A" } -- j5 K2: the short "+50%/pt"
   function Ti()
     return Mrgl.Core.Tide
   end
@@ -937,46 +940,65 @@ do
     sep:SetSize(248, 1)
     sep:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -80)
     K().SetColor(sep, C().line)
-    -- R3 rows
+    -- j5 K2: the three path columns
     tw.paths = {}
     for i = 1, U.Len(D.paths) do
       U.Insert(tw.paths, buildTidePath(pg, f, i))
     end
     pg:Hide()
   end
+  -- j5 K2 (Jan's mockup docs/tide-cols): three columns Murlocs | Self-Click | Spells, 82 px each at y -84..-264.
+  -- Per column top to bottom: path icon 24 (gold edge with points), name, points (grey at 0), bonus ("×n" green, at 0
+  -- "+50%/pt"...), then the milestones 10/25/50/100 as 20-px nodes on a vertical rail that fills gold up to the points
+  -- (interpolated between the nodes). The long texts are in the tooltips (column = TidePath, node = TideMs).
+  -- j5b P2: LOCK_NUM = a locked node's number: light grey (x the node's 0.7 = about text grey 0.6)
+  local COL = { W = 82, H = 180, NODE = 20, GAP = 6, TRACK = -78, LOCK_NUM = { 0.85, 0.84, 0.80, 1 } }
   function buildTidePath(pg, f, i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     local r = CreateFrame("Button", "MrglSquadTidePath" .. i, pg)
-    r:SetSize(248, 56)
-    r:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -84 - (i - 1) * 60)
-    local sep = r:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT", r, "BOTTOMLEFT", 0, -2)
-    sep:SetPoint("TOPRIGHT", r, "BOTTOMRIGHT", 0, -2)
-    K().SetColor(sep, C().line)
-    r.ic = tideBox(r, "MrglSquadTidePathIcon" .. i, 28, p.icon)
-    r.ic:SetPoint("TOPLEFT", r, "TOPLEFT", 2, -2)
-    r.ic.edge:SetShown(false)
+    r:SetSize(COL.W, COL.H)
+    r:SetPoint("TOPLEFT", f, "TOPLEFT", 8 + (i - 1) * (COL.W + 1), -84)
+    if i > 1 then
+      local sep = r:CreateTexture(nil, "ARTWORK")
+      sep:SetSize(1, COL.H - 4)
+      sep:SetPoint("TOPLEFT", r, "TOPLEFT", -1, -2)
+      K().SetColor(sep, C().line)
+    end
+    r.ic = tideBox(r, "MrglSquadTidePathIcon" .. i, 24, p.icon)
+    r.ic:SetPoint("TOP", r, "TOP", 0, -4)
     r.rec = K().Border(r.ic, C().gold, "OVERLAY", 0, 1, 1) -- R3: recommended first (Murlocs while Total() = 0), static
     r.rec:SetShown(false)
-    r.name = K().Text(r, K().FRIZ, 12, C().text, "")
-    r.name:SetPoint("TOPLEFT", r.ic, "TOPRIGHT", 8, -1)
+    r.name = K().Text(r, K().FRIZ, 11, C().text, "")
+    r.name:SetPoint("TOP", r.ic, "BOTTOM", 0, -3)
+    r.name:SetJustifyH("CENTER")
     r.name:SetText(p.name)
     r.points = K().Text(r, K().ARIALN, 16, C().white, "OUTLINE")
-    r.points:SetPoint("TOPRIGHT", r, "TOPRIGHT", -6, -4)
-    r.points:SetJustifyH("RIGHT")
+    r.points:SetPoint("TOP", r.name, "BOTTOM", 0, -2)
+    r.points:SetJustifyH("CENTER")
     r.effect = K().Text(r, K().ARIALN, 10, C().good, "")
-    r.effect:SetWidth(170)
-    r.effect:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+    r.effect:SetPoint("TOP", r.points, "BOTTOM", 0, -1)
+    r.effect:SetJustifyH("CENTER")
+    -- the rail from the first node's centre to the last one's, 2 px wide, under the nodes; the gold fill from the top
+    local len = (U.Len(p.ms) - 1) * (COL.NODE + COL.GAP)
+    r.rail = r:CreateTexture(nil, "ARTWORK")
+    r.rail:SetSize(2, len)
+    r.rail:SetPoint("TOP", r, "TOP", 0, COL.TRACK - COL.NODE / 2)
+    r.rail:SetColorTexture(1, 1, 1, 0.18) -- j5b P3: the empty rail a bit more visible (line is 0.10), still far from gold
+    r.railLen = len
+    r.fill = r:CreateTexture(nil, "ARTWORK", nil, 1)
+    r.fill:SetWidth(2)
+    r.fill:SetPoint("TOP", r.rail, "TOP", 0, 0)
+    K().SetColor(r.fill, C().gold)
+    r.fill:Hide()
     r.ms = {}
     for k = 1, U.Len(p.ms) do
       local d = U.At(p.ms, k)
-      local m = tideBox(r, "MrglSquadTideMs" .. i .. k, 20, d.icon, true)
-      m:SetPoint("TOPLEFT", r, "TOPLEFT", 38 + (k - 1) * 26, -32)
+      local m = tideBox(r, "MrglSquadTideMs" .. i .. k, COL.NODE, d.icon, true)
+      m:SetPoint("TOP", r, "TOP", 0, COL.TRACK - (k - 1) * (COL.NODE + COL.GAP))
       K().Highlight(m, m.icon, 0.15, true)
-      m.num = K().Text(m, K().ARIALN, 10, C().white, "OUTLINE") -- bottom right, like a bag stack count (tide1c C9: 10 px)
-      m.num:SetPoint("BOTTOMRIGHT", m, "BOTTOMRIGHT", 0, 1)
-      m.num:SetJustifyH("RIGHT")
+      m.num = K().Text(m, K().ARIALN, 10, C().muted, "OUTLINE") -- right of the node (tide1c C9: 10 px)
+      m.num:SetPoint("LEFT", m, "RIGHT", 3, 0)
+      m.num:SetJustifyH("LEFT")
       m.num:SetText(U.Str(d.at))
       m.path = i
       m.k = k
@@ -988,13 +1010,6 @@ do
       end)
       U.Insert(r.ms, m)
     end
-    r.barBg = r:CreateTexture(nil, "ARTWORK")
-    r.barBg:SetSize(20, 2)
-    r.barBg:SetColorTexture(1, 1, 1, 0.1)
-    r.bar = r:CreateTexture(nil, "ARTWORK", nil, 1)
-    r.bar:SetHeight(2)
-    r.bar:SetPoint("TOPLEFT", r.barBg, "TOPLEFT", 0, 0)
-    K().SetColor(r.bar, C().gold)
     r.index = i
     K().Tip(r, function(tt, self)
       Tips().TidePath(tt, self.index)
@@ -1061,7 +1076,8 @@ do
       fillTidePath(U.At(tw.paths, i), i, total, nw)
     end
   end
-  -- R3: points, the path factor (or "+50% per point" at 0), milestone states, the bar under the next milestone
+
+  -- j5 K2: points, the bonus ("×n", or "+50%/pt" at 0), node states and the gold rail up to the points
   function fillTidePath(r, i, total, nw)
     local S = Mrgl.Data.Strings
     local p = U.At(Mrgl.Data.Tide.paths, i)
@@ -1070,14 +1086,17 @@ do
     if n > 0 then
       K().SetTextColor(r.points, C().white)
       K().SetTextColor(r.effect, C().good)
-      r.effect:SetText(U.Fill(S.TIDE_PATH_BONUS, { effect = Tips().TideEffect(p.id) })) -- tide1b T2: on top of the tide
+      r.effect:SetText(U.Fill(S.TIDE_FLOOD_X, { x = U.Short(Tips().TideMult(p.id)) }))
+      r.ic.icon:SetDesaturated(false)
+      r.ic.edge:SetColor(C().gold)
     else
       K().SetTextColor(r.points, C().muted)
-      K().SetTextColor(r.effect, C().muted)
+      K().SetTextColor(r.effect, C().good)
       r.effect:SetText(S[TIDE_PER[p.id]])
+      r.ic.icon:SetDesaturated(true)
+      r.ic.edge:SetColor(C().line)
     end
     r.rec:SetShown(total <= 0 and i == 1)
-    local nextK = 0
     for k = 1, U.Len(r.ms) do
       local m = U.At(r.ms, k)
       local st = Tips().TideMsState(i, k)
@@ -1085,41 +1104,32 @@ do
         m.icon:SetDesaturated(false)
         m:SetAlpha(1)
         m.edge:SetColor(C().gold)
+        K().SetTextColor(m.num, C().gold)
       elseif st == "off" then
         m.icon:SetDesaturated(true)
         m:SetAlpha(1)
         m.edge:SetColor(C().gold, 0.5)
-      elseif st == "next" then
+        K().SetTextColor(m.num, C().gold)
+      else
         m.icon:SetDesaturated(true)
         m:SetAlpha(0.7)
         m.edge:SetColor(C().line)
-        nextK = k
-      else
-        m.icon:SetDesaturated(true)
-        m:SetAlpha(0.35)
-        m.edge:SetColor(C().line)
+        K().SetTextColor(m.num, COL.LOCK_NUM)
       end
       tideNewEdge(m, nw[U.At(p.ms, k).id] == true)
     end
-    if nextK <= 0 then
-      r.barBg:Hide()
-      r.bar:Hide()
-      return
+    -- the fill: each of the 3 gaps between the nodes fills with the share of its points (10 -> 25 -> 50 -> 100)
+    local segs, frac = U.Len(p.ms) - 1, 0
+    for j = 2, U.Len(p.ms) do
+      local lo, hi = U.At(p.ms, j - 1).at, U.At(p.ms, j).at
+      frac = frac + math.max(0, math.min(1, (n - lo) / (hi - lo)))
     end
-    local lo = 0
-    if nextK > 1 then
-      lo = U.At(p.ms, nextK - 1).at
-    end
-    local hi = U.At(p.ms, nextK).at
-    r.barBg:ClearAllPoints()
-    r.barBg:SetPoint("TOPLEFT", U.At(r.ms, nextK), "BOTTOMLEFT", 0, -2)
-    r.barBg:Show()
-    local px = math.floor(20 * (n - lo) / (hi - lo))
+    local px = math.floor(r.railLen * frac / segs)
     if px >= 1 then
-      r.bar:SetWidth(px)
-      r.bar:Show()
+      r.fill:SetHeight(px)
+      r.fill:Show()
     else
-      r.bar:Hide()
+      r.fill:Hide()
     end
   end
   -- R2/R3: a reached milestone with a toggle (s10, a10) or the Quartermaster after the first New Tide switches settings[key]

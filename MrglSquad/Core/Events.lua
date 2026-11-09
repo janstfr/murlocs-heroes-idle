@@ -73,7 +73,12 @@ do
       autoBuyT = math.floor(now / Mrgl.Data.Balance.TIDE_AUTOBUY_SEC),   -- last auto-buy slot
       autoBuy = false,      -- Shop.BuyBest(true) is buying: BUY/UPGRADE/SELF_UP/MILESTONE/BUY_CHAIN carry auto = true
       queueKinds = {},      -- tide1c C2: hit kind per queued click (slots 1..queued)
-      tideVeil = false      -- tide1c C7: the tide popup or moment is up (set by the UI): no boss start
+      tideVeil = false,     -- tide1c C7: the tide popup or moment is up (set by the UI): no boss start
+      enemyAge = 0,         -- j5 K5: seconds the current enemy has lived (Combat.Squad), see Combat.Damage
+      enemyBank = 0,        -- j5 K5: damage held by the MIN_LIFE floor
+      killSet = false,      -- j5 K5: the killer of the current enemy is known (killGold, killKind)
+      killGold = 1,
+      killKind = nil
     }
   end
   C.rt = C.NewRuntime(0)
