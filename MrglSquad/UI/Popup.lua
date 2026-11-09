@@ -2,7 +2,7 @@ local ADDON, Mrgl = ...
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, Tips, Panel, readinessColor, rowY, toggleRow, textButton, label, screenPos
-  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill, tideCover
+  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill, tideCover, openPath
   local Po = {}
   Mrgl.UI.Popup = Po
   local U = Mrgl.U
@@ -400,6 +400,18 @@ do
     end
     return 0
   end
+  function openPath(id)
+    if not Tips().TidePathFull(id) then
+      return id
+    end
+    local paths = Mrgl.Data.Tide.paths
+    for i = 1, U.Len(paths) do
+      if not Tips().TidePathFull(U.At(paths, i).id) then
+        return U.At(paths, i).id
+      end
+    end
+    return id
+  end
   function tideFill()
     local S = Mrgl.Data.Strings
     local D = Mrgl.Data.Tide
@@ -408,12 +420,24 @@ do
     for i = 1, U.Len(tp.picks) do
       local b = U.At(tp.picks, i)
       local on = b.id == tp.path
-      b.sel:SetShown(on)
-      b.edge:SetShown(not on)
-      if on then
+      local full = Tips().TidePathFull(b.id)
+      b.sel:SetShown(on and not full)
+      b.edge:SetShown(not on or full)
+      b.icon:SetDesaturated(full)
+      b:SetEnabled(not full)
+      if full then
+        b:SetAlpha(0.35)
+      elseif on then
         b:SetAlpha(1)
       else
         b:SetAlpha(0.6)
+      end
+      if full then
+        b.tag:SetAlpha(0.35)
+        b.tag2:SetAlpha(0.35)
+      else
+        b.tag:SetAlpha(1)
+        b.tag2:SetAlpha(1)
       end
     end
     local pi = pathIndex(tp.path)
@@ -444,6 +468,8 @@ do
     K().SetIcon(tp.go.icon, p.icon)
     local inC = Core().rt.inCombat == true
     tp.inC = inC
+    local wv = Tips().TideWaveNext()
+    K().SetTextColor(tp.forever, C().muted)
     if inC then
       tp.go:SetAlpha(0.45)
       tp.go:Disable()
@@ -451,7 +477,12 @@ do
     else
       tp.go:SetAlpha(1)
       tp.go:Enable()
-      tp.forever:SetText(S.TIDE_FOREVER)
+      if wv ~= nil then
+        tp.forever:SetText(U.Fill(S.TIDE_WAVE_WARN, { n = wv }))
+        K().SetTextColor(tp.forever, C().gold)
+      else
+        tp.forever:SetText(S.TIDE_FOREVER)
+      end
     end
   end
   Po.ShowTide = function()
@@ -466,6 +497,7 @@ do
     if pr.count <= 0 or pathIndex(tp.path) <= 0 then
       tp.path = "m"
     end
+    tp.path = openPath(tp.path)
     tp.open = true
     tp.cover = ""
     tideCover()
@@ -482,7 +514,7 @@ do
     return tp.open
   end
   Po.TidePick = function(id)
-    if not tp.open or pathIndex(id) <= 0 then
+    if not tp.open or pathIndex(id) <= 0 or Tips().TidePathFull(id) then
       return
     end
     tp.path = id

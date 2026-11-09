@@ -72,7 +72,7 @@ do
   Bo.Start = function(auto)
     local db = Mrgl.db
     local rt = C.rt
-    if not Cb().GateOpen() or rt.inCombat then
+    if not Cb().GateOpen() or (rt.inCombat and auto == true) then
       return false
     end
     if rt.tideVeil == true then
@@ -128,9 +128,11 @@ do
     db.boss.resetStage = 0
     db.autoFailDps[bs] = nil
     C.Fire("BOSS_WIN", { stage = bs, name = e.name, gold = gold })
-    if F().ZoneIndex(bs) == 11 and F().IsZoneBoss(bs) and db.prestige.trophies.nef ~= true then
-      db.prestige.trophies.nef = true
-      C.Fire("TROPHY", { id = "nef" })
+    if F().ZoneIndex(bs) == 11 and F().IsZoneBoss(bs) then
+      local hw = Mrgl.Core.Tide.NefWin()
+      if hw > 0 then
+        C.Fire("TROPHY", { id = "nef", wave = hw })
+      end
     end
     Cb().SetStage(bs + 1)
     Mrgl.Core.Abilities.CheckUnlock()

@@ -41,5 +41,6 @@ Mrgl.Data.Tide = {
   flood = "Every New Tide: +100% murloc damage and +50% gold, whatever path you pick.",
   trophies = { { id = "nef", icon = "INV_Misc_Head_Dragon_01", name = "Head of Nefarian",
                 need = "Defeat Nefarian (stage 110).", done = "Nefarian has fallen." } },
-  coming = { { name = "Ahn'Qiraj", icon = "INV_Qiraj_HuskOldGod" }, { name = "Naxxramas", icon = "Spell_Frost_FrostWard" } }
+  coming = { { name = "Ahn'Qiraj", icon = "INV_Qiraj_HuskOldGod" }, { name = "Naxxramas", icon = "Spell_Frost_FrostWard" } },
+  waves = { 95, 480, 1400, 3000, 7200, 1.1e4, 1.6e4, 2.2e4, 3.0e4, 8.2e4, 2.8e5, 3.1e5, 4.0e5, 5.0e5, 5.3e5, 6.4e5, 7.4e5, 7.8e5, 8.4e5, 1.2e6, 7.6e6, 1.1e7, 2.1e7, 3.0e7, 5.0e7, 5.4e7, 7.0e7, 8.6e7, 9.7e7 }
 }

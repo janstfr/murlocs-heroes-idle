@@ -1294,6 +1294,10 @@ do
         td.line(Td.Def(id), id)
       end
     end
+    local wv = Mrgl.UI.Tips.TideWaveJump()
+    if wv ~= nil then
+      J.Headline("tide", U.Fill(S().TIDE_WAVE_HEAD, { n = wv }))
+    end
   end
   td.line = function(d, id)
     if d == nil then

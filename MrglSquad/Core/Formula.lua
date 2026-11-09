@@ -23,7 +23,23 @@ do
   F.HP = function(s)
     return B().HP_BASE * B().HP_GROWTH ^ (s - 1) + B().HP_LIN * (s - 1)
   end
-  F.EnemyHP = function(s)
+  F.WaveMult = function()
+    local db = Mrgl.db
+    if db == nil or db.prestige == nil then
+      return 1
+    end
+    local b = B()
+    local n = db.prestige.count
+    if not (n >= b.TIDE_WAVE) or n >= b.TIDE_WAVE_END then
+      return 1
+    end
+    local j = U.At(Mrgl.Data.Tide.waves, math.floor(n / b.TIDE_WAVE))
+    if not (j ~= nil and j > 0) then
+      return 1
+    end
+    return j ^ ((b.TIDE_WAVE - 1 - n % b.TIDE_WAVE) / (b.TIDE_WAVE - 1))
+  end
+  local function baseHP(s)
     if F.IsZoneBoss(s) then
       if s >= 30 and s <= 50 then
         return F.HP(s) * B().BOSS_HP_MULT_MID
@@ -37,6 +53,9 @@ do
       return F.HP(s) * B().MINIBOSS_HP_MULT
     end
     return F.HP(s)
+  end
+  F.EnemyHP = function(s)
+    return baseHP(s) * F.WaveMult()
   end
   F.ZoneIndex = function(s)
     return math.min(B().ZONES, math.floor((s - 1) / B().STAGES_PER_ZONE) + 1)
@@ -316,7 +335,7 @@ do
     if not (total > 0) then
       return 0
     end
-    return F.Gold(s, false, false, M) / (F.HP(s) / total + B().RESPAWN)
+    return F.Gold(s, false, false, M) / (F.HP(s) * F.WaveMult() / total + B().RESPAWN)
   end
   F.OfflineGold = function(M, S, s, dt)
     local b = B()
@@ -325,6 +344,6 @@ do
       return 0
     end
     local t = math.min(dt, b.OFFLINE_MAX)
-    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) / d + b.RESPAWN)
+    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) * F.WaveMult() / d + b.RESPAWN)
   end
 end
