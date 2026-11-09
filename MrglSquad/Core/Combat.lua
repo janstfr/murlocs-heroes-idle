@@ -37,7 +37,7 @@ do
     end
     local i = U.At(PAIR, pos) + (s + k) % 2
     local e = U.At(z.normals, i)
-    return { name = e.name, icon = e.icon, kind = "normal", rank = i }
+    return { name = e.name, icon = e.icon, kind = "normal", rank = i, tint = e.tint }
   end
   Cb.KillIndex = function()
     local db = Mrgl.db
@@ -51,7 +51,7 @@ do
     local e = Cb.EnemyAt(db.stage, Cb.KillIndex())
     if db.enemyRare and e.kind == "normal" then
       local r = U.At(Cb.Zone(db.stage).rares, db.stage % 2 + 1)
-      e = { name = r.name, icon = r.icon, kind = "rare", rank = 0, shortName = r.shortName }
+      e = { name = r.name, icon = r.icon, kind = "rare", rank = 0, shortName = r.shortName, tint = r.tint }
     end
     return e
   end

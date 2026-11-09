@@ -32,7 +32,7 @@ do
   M.GEO = { w = 240, h = 304, enemyX = 120, enemyY = -94, enemyHalf = 44, goldIconX = 187.5, goldIconY = -13.5, goldIconHalf = 6.5, coinCtrlX = 182, coinCtrlY = -34, hMin = 26 }
   local w = {}
   M.w = w
-  local st = { goldShown = 0, goldFrom = 0, goldTo = 0, goldT = 1, goldHold = 0, lag = 1, lagDelay = 0, hpFrac = 1, enemyLocked = false, zone = 0, tintA = true, bossState = "", autoCd = false, t = 0, hopT = 0, unlockAt = {}, collectPulse = false, wasPopup = false, zoneDefer = false, bossHide = false, strBase = -1, pxScale = 0, hoverA = 0, nameA = 1, nameTarget = 1, saveTo = -1, saveFill = -1, saveMark = -1, bossAwayUntil = 0, plusT = -1, plusFresh = false, buyLow = false, min = false, dimA = 1, clickAt = -10, compHold = {}, anyfinHold = false, lookKey = "", lookT = -100, lookFast = false, lookBoss = false, lookIcon = "", xfade = 0 }
+  local st = { goldShown = 0, goldFrom = 0, goldTo = 0, goldT = 1, goldHold = 0, lag = 1, lagDelay = 0, hpFrac = 1, enemyLocked = false, zone = 0, tintA = true, bossState = "", autoCd = false, t = 0, hopT = 0, unlockAt = {}, collectPulse = false, wasPopup = false, zoneDefer = false, bossHide = false, strBase = -1, pxScale = 0, hoverA = 0, nameA = 1, nameTarget = 1, saveTo = -1, saveFill = -1, saveMark = -1, bossAwayUntil = 0, plusT = -1, plusFresh = false, buyLow = false, min = false, dimA = 1, clickAt = -10, compHold = {}, anyfinHold = false, lookKey = "", lookBoss = false, lookIcon = "", xfade = 0 }
   local BOSS_AWAY = 3
   M.DIM = { a = 0.35, aClick = 0.6, clickT = 1, inT = 0.2, outT = 0.3 }
   local PLUS_IN = 0.2; local PLUS_HOLD = 1.8; local PLUS_END = 2.2
@@ -961,6 +961,7 @@ do
     end
   end
   M.Hit = function(manual)
+    M.Press()
     K().TipPoke(w.enemy)
     if manual == true then
       J().ManualClick()
@@ -970,7 +971,48 @@ do
       w.onboardRing:Hide()
     end
     Core().Combat.Click(manual == true)
-    J().Punch()
+  end
+  M.PRESS = { px = 4, calm = 3, hold = 0.04, back = 0.10, inset = 2 }
+  st.press = { t = -1, d = 0, set = 0 }
+  local function pressInset(d)
+    if d == st.press.set then
+      return
+    end
+    st.press.set = d
+    local i = M.PRESS.inset + d
+    w.enemyIcon:SetPoint("TOPLEFT", w.enemy, "TOPLEFT", i, -i)
+    w.enemyIcon:SetPoint("BOTTOMRIGHT", w.enemy, "BOTTOMRIGHT", -i, i)
+  end
+  M.Press = function()
+    if w.enemyIcon == nil or not w.frame:IsVisible() then
+      return
+    end
+    local d = M.PRESS.px
+    if Mrgl.db.settings.calm then
+      d = M.PRESS.calm
+    end
+    st.press.d = d
+    st.press.t = 0
+    pressInset(d)
+  end
+  M.UpdatePress = function(dt)
+    local pr = st.press
+    if pr.t < 0 then
+      return
+    end
+    pr.t = pr.t + dt
+    local P = M.PRESS
+    local d = pr.d
+    if pr.t >= P.hold + P.back then
+      d = 0
+      pr.t = -1
+    elseif pr.t > P.hold then
+      d = math.floor(pr.d * (1 - (pr.t - P.hold) / P.back) + 0.5)
+    end
+    pressInset(d)
+  end
+  M.PressDepth = function()
+    return st.press.set
   end
   M.FightBoss = function()
     if Core().Combat.GateOpen() then
@@ -1020,22 +1062,43 @@ do
     end
     return GetTime() - t
   end
+  st.nameSet = -1
+  st.dimSet = -1
+  M.ApplyNameAlpha = function(force)
+    local a = st.nameA
+    if a == st.nameSet and force ~= true then
+      return
+    end
+    st.nameSet = a
+    w.name:SetAlpha(a)
+    w.name:SetShown(a > 0)
+  end
+  M.ApplyDim = function(force)
+    if st.dimA == st.dimSet and force ~= true then
+      return
+    end
+    st.dimSet = st.dimA
+    w.enemyIcon:SetAlpha(st.dimA)
+  end
   function spotLook()
     local db = Mrgl.db
     local e = Core().Combat.Enemy()
+    local r, g, b, a
     if Core().Combat.CandleActive() then
-      K().SetVertex(w.spot, { 1, 0.8, 0.4, 1 })
-      w.spot:SetAlpha(0.25)
+      r, g, b, a = 1, 0.8, 0.4, 0.25
+    elseif e.kind == "rare" and not db.boss.active then
+      r, g, b, a = 0.55, 0.75, 1.0, 0.22
+    else
+      local tint = Core().Combat.Zone(db.stage).tint
+      r, g, b, a = U.At(tint, 1) * 0.5 + 0.5, U.At(tint, 2) * 0.5 + 0.5, U.At(tint, 3) * 0.5 + 0.5, 0.15
+    end
+    local sig = r .. "," .. g .. "," .. b .. "," .. a
+    if sig == st.spotSig then
       return
     end
-    if e.kind == "rare" and not db.boss.active then
-      K().SetVertex(w.spot, { 0.55, 0.75, 1.0, 1 })
-      w.spot:SetAlpha(0.22)
-      return
-    end
-    local tint = Core().Combat.Zone(db.stage).tint
-    K().SetVertex(w.spot, { U.At(tint, 1) * 0.5 + 0.5, U.At(tint, 2) * 0.5 + 0.5, U.At(tint, 3) * 0.5 + 0.5, 1 })
-    w.spot:SetAlpha(0.15)
+    st.spotSig = sig
+    w.spot:SetVertexColor(r, g, b, 1)
+    w.spot:SetAlpha(a)
   end
   M.SpotLook = spotLook
   M.HpShown = function(hp, max)
@@ -1050,25 +1113,16 @@ do
     end
     return f
   end
-  local LOOK_HOLD, LOOK_XFADE = 2, 0.15
+  local LOOK_XFADE = 0.15
   function setEnemyLook(force)
     local db = Mrgl.db
     local e = Core().Combat.Enemy()
     local key = e.icon .. "|" .. e.name .. "|" .. e.kind
     local boss = db.boss.active == true
     if key ~= st.lookKey then
-      local fast = J().FastFarm()
-      local held = force ~= true and not (boss and not st.lookBoss) and (fast or st.lookFast)
-      if held and GetTime() - st.lookT < LOOK_HOLD then
-        if st.lookBoss and not boss then
-          w.enemyBadge:Hide()
-          w.enemyBadgeBg:Hide()
-        end
-        spotLook()
-        return
-      end
       local o, t = w.enemyIconOld, st.lookTint
-      if held and st.lookIcon ~= "" and st.lookIcon ~= e.icon then
+      local fade = force ~= true and J().FastFarm() and not (boss and not st.lookBoss) and st.xfade <= 0
+      if fade and st.lookIcon ~= "" and st.lookIcon ~= e.icon then
         K().SetIcon(o, st.lookIcon)
         o:SetDesaturated(t ~= nil)
         if t ~= nil then
@@ -1084,9 +1138,13 @@ do
         o:Hide()
       end
       st.lookKey = key
-      st.lookT = GetTime()
-      st.lookFast = fast
     end
+    local sig = key .. "|" .. tostring(boss) .. "|" .. tostring(e.kind == "rare" and not boss)
+    if sig == st.lookSig and force ~= true then
+      spotLook()
+      return
+    end
+    st.lookSig = sig
     st.lookBoss = boss
     st.lookIcon = e.icon
     st.lookTint = e.tint
@@ -1103,6 +1161,7 @@ do
       bc = C().rare
     end
     K().SetTextColor(w.name, c)
+    M.ApplyNameAlpha(true)
     w.enemyBorder.SetColor(bc)
     w.enemyRareBorder:SetShown(rare)
     if db.boss.active then
@@ -1152,6 +1211,7 @@ do
       w.enemyFace:Hide()
       w.enemyFaceBg:Hide()
     end
+    M.ApplyDim(true)
   end
   M.LockEnemy = function(on)
     st.enemyLocked = on
@@ -1849,6 +1909,7 @@ do
       refreshBuyBest()
     end
     updateSaveFill(dt)
+    M.UpdatePress(dt)
     local over = w.frame:IsMouseOver()
     if over then
       st.hoverA = math.min(1, st.hoverA + dt / 0.15)
@@ -1875,7 +1936,7 @@ do
     elseif st.nameA < st.nameTarget then
       st.nameA = math.min(st.nameTarget, st.nameA + dt / 0.2)
     end
-    w.name:SetAlpha(st.nameA)
+    M.ApplyNameAlpha()
     local dim = M.DIM
     local dimTo = 1
     if J().EnemyDim() then
@@ -1889,7 +1950,7 @@ do
     elseif st.dimA < dimTo then
       st.dimA = math.min(dimTo, st.dimA + dt * (1 - dim.a) / dim.outT)
     end
-    w.enemyIcon:SetAlpha(st.dimA)
+    M.ApplyDim()
     if st.xfade > 0 then
       st.xfade = math.max(0, st.xfade - dt)
       w.enemyIconOld:SetAlpha(st.dimA * st.xfade / LOOK_XFADE)

@@ -48,10 +48,19 @@ do
     end
     return math.max(db.maxStage, gate)
   end
+  T.PathFull = function(p)
+    return T.Points(p) >= B().TIDE_PATH_MAX
+  end
+  T.Full = function()
+    return T.PathFull("m") and T.PathFull("s") and T.PathFull("a")
+  end
   T.Avail = function()
-    return T.Reached() >= B().TIDE_STAGE
+    return T.Reached() >= B().TIDE_STAGE and not T.Full()
   end
   T.Blocked = function()
+    if T.Full() then
+      return "full"
+    end
     if C.rt.inCombat then
       return "combat"
     end
@@ -283,7 +292,61 @@ do
   end
   T.Trophy = function(id)
     local db = Mrgl.db
+    if id == "nef" and T.NefCount() > 0 then
+      return true
+    end
     return db.prestige.trophies[id] == true
+  end
+  T.Wave = function()
+    local b = B()
+    return math.min(b.TIDE_WAVE_END / b.TIDE_WAVE, math.floor(T.Total() / b.TIDE_WAVE) + 1)
+  end
+  local function nefw()
+    return Mrgl.db.prestige.trophies.nefw
+  end
+  T.NefCount = function()
+    local s, c = nefw(), 0
+    for i = 1, string.len(s) do
+      if string.sub(s, i, i) == "1" then
+        c = c + 1
+      end
+    end
+    return c
+  end
+  T.NefThisWave = function()
+    local w = T.Wave()
+    return string.sub(nefw(), w, w) == "1"
+  end
+  T.NefMissed = function()
+    local s, c = nefw(), 0
+    for i = 1, T.Wave() - 1 do
+      if string.sub(s, i, i) ~= "1" then
+        c = c + 1
+      end
+    end
+    return c
+  end
+  T.NefWin = function()
+    local tr = Mrgl.db.prestige.trophies
+    local s = tr.nefw
+    local w = T.Wave()
+    local k = 0
+    if string.sub(s, w, w) ~= "1" then
+      k = w
+    else
+      for i = 1, w - 1 do
+        if string.sub(s, i, i) ~= "1" then
+          k = i
+          break
+        end
+      end
+    end
+    if k == 0 then
+      return 0
+    end
+    tr.nefw = string.sub(s, 1, k - 1) .. "1" .. string.sub(s, k + 1)
+    tr.nef = true
+    return k
   end
   T.Rise = function(path, committed)
     local db = Mrgl.db
@@ -293,7 +356,7 @@ do
     if committed == true and bl == "combat" and not db.boss.active then
       bl = nil
     end
-    if not T.Avail() or bl ~= nil or not T.IsPath(path) then
+    if not T.Avail() or bl ~= nil or not T.IsPath(path) or T.PathFull(path) then
       return false
     end
     local pr = db.prestige

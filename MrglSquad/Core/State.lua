@@ -42,7 +42,8 @@ do
                      abilitiesShown = false },
       stats = { clicks = 0, kills = 0, bosses = 0, crits = 0, rareSeen = "" },
       rng = 12345,
-      prestige = { count = 0, best = 1, last = "m", paths = { m = 0, s = 0, a = 0 }, trophies = { nef = false } },
+      prestige = { count = 0, best = 1, last = "m", paths = { m = 0, s = 0, a = 0 }, ultimate = 0,
+                  trophies = { nef = false, nefw = "000000000000000000000000000000" } },
       guests = {}
     }
     local list = Mrgl.Data.Murlocs
@@ -257,7 +258,29 @@ do
     end
     pr.best = math.max(math.floor(pr.best), db.maxStage)
     db.stats.rareSeen = St.NormRares(db.stats.rareSeen)
+    local tr = pr.trophies
+    local hadW = U.IsTable(raw.prestige) and U.IsTable(raw.prestige.trophies) and type(raw.prestige.trophies.nefw) == "string"
+    tr.nefw = St.NormNefw(tr.nefw)
+    if not hadW and tr.nef == true then
+      tr.nefw = "1" .. string.sub(tr.nefw, 2)
+    end
+    pr.ultimate = math.floor(pr.ultimate)
     return db
+  end
+  St.NormNefw = function(s)
+    local out = ""
+    for i = 1, 30 do
+      local ch = ""
+      if type(s) == "string" then
+        ch = string.sub(s, i, i)
+      end
+      if ch == "1" then
+        out = out .. "1"
+      else
+        out = out .. "0"
+      end
+    end
+    return out
   end
   function deep(t)
     if not U.IsTable(t) then
