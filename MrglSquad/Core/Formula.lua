@@ -23,21 +23,13 @@ do
   F.HP = function(s)
     return B().HP_BASE * B().HP_GROWTH ^ (s - 1) + B().HP_LIN * (s - 1)
   end
-  F.WaveMult = function()
-    local db = Mrgl.db
-    if db == nil or db.prestige == nil then
-      return 1
-    end
+  F.HardMult = function(s)
     local b = B()
-    local n = db.prestige.count
-    if not (n >= b.TIDE_WAVE) or n >= b.TIDE_WAVE_END then
+    local d = s - b.HARD_STAGE
+    if d <= 0 then
       return 1
     end
-    local j = U.At(Mrgl.Data.Tide.waves, math.floor(n / b.TIDE_WAVE))
-    if not (j ~= nil and j > 0) then
-      return 1
-    end
-    return j ^ ((b.TIDE_WAVE - 1 - n % b.TIDE_WAVE) / (b.TIDE_WAVE - 1))
+    return b.HARD_GROWTH ^ d * b.HARD_CURVE ^ (d * d / b.HARD_CURVE_DIV)
   end
   local function baseHP(s)
     if F.IsZoneBoss(s) then
@@ -55,7 +47,16 @@ do
     return F.HP(s)
   end
   F.EnemyHP = function(s)
-    return baseHP(s) * F.WaveMult()
+    local b = B()
+    local h = baseHP(s) * F.HardMult(s)
+    if s > b.HARD_STAGE then
+      if F.IsZoneBoss(s) then
+        h = h * b.BOSS_HP_HIGH
+      elseif F.IsBoss(s) then
+        h = h * b.MINIBOSS_HP_HIGH
+      end
+    end
+    return math.min(b.HP_CAP, h)
   end
   F.ZoneIndex = function(s)
     return math.min(B().ZONES, math.floor((s - 1) / B().STAGES_PER_ZONE) + 1)
@@ -68,9 +69,9 @@ do
   end
   F.GoldMult = function(M)
     if M.raider.u >= 3 then
-      return (1 + B().RAIDER_GOLD) * Ti().FloodGold()
+      return (1 + B().RAIDER_GOLD) * Ti().GoldMult()
     end
-    return Ti().FloodGold()
+    return Ti().GoldMult()
   end
   F.Gold = function(s, boss, rare, M)
     local b = B()
@@ -195,12 +196,38 @@ do
   F.MurkyDPS = function()
     return Ti().MurkyDPS()
   end
-  F.SquadDPS = function(M)
+  F.SquadRaw = function(M)
     local t = 0
     for i = 1, U.Len(Mrgl.Data.Murlocs) do
       t = t + F.MurlocDPS(M, i)
     end
-    return t + F.MurkyDPS()
+    return math.min(B().HP_CAP, t + F.MurkyDPS())
+  end
+  local sq = { v = 0, M = nil, mm = -1, mk = -1, n = {}, u = {} }
+  F.SquadDPS = function(M)
+    local db = Mrgl.db
+    if db == nil or M ~= db.murlocs then
+      return F.SquadRaw(M)
+    end
+    local mm = Ti().MurlocMult()
+    local mk = F.MurkyDPS()
+    local same = sq.M == M and sq.mm == mm and sq.mk == mk
+    local list = Mrgl.Data.Murlocs
+    for i = 1, U.Len(list) do
+      local e = M[U.At(list, i).id]
+      if U.At(sq.n, i) ~= e.n or U.At(sq.u, i) ~= e.u then
+        same = false
+        U.Set(sq.n, i, e.n)
+        U.Set(sq.u, i, e.u)
+      end
+    end
+    if same ~= true then
+      sq.M = M
+      sq.mm = mm
+      sq.mk = mk
+      sq.v = F.SquadRaw(M)
+    end
+    return sq.v
   end
   F.UpgradeCost = function(i, tier)
     return U.At(F.Murloc(i).upgrades, tier).cost * Ti().CostMult()
@@ -216,10 +243,13 @@ do
     if M.tinyfin.u >= 3 then
       p = p + B().TINYFIN_ECHO
     end
+    if Ti().EchoFloor() then
+      p = math.max(B().TIDE_ECHO_FLOOR, p)
+    end
     return p
   end
   F.ClickDamage = function(M, S, dps)
-    return (F.ClickBase(S) + F.EchoShare(M, S) * dps) * Ti().ClickMult()
+    return math.min(B().HP_CAP, (F.ClickBase(S) + F.EchoShare(M, S) * dps) * Ti().ClickMult())
   end
   F.CritChance = function(S, candle)
     local p = B().CRIT_BASE + B().CRIT_STEP * S.crit
@@ -294,7 +324,7 @@ do
         p = 1
       end
       local cl = Pw("WHELPS_CPS") * Mrgl.Core.Abilities.BuffDur("whelps")
-      t = t + cl * click * (1 + p * (cm - 1))
+      t = t + cl * click * Ti().SpellMult() * (1 + p * (cm - 1))
     end
     return t
   end
@@ -310,7 +340,12 @@ do
     local d = F.SquadDPS(M)
     local T = F.BossTimer(M)
     local hp = F.EnemyHP(bs)
-    if d * T >= b.READY_GREEN * hp then
+    local dg = d
+    local ac = Ti().AutoSwing()
+    if ac > 0 then
+      dg = d + ac * F.ClickExpected(M, S, d, false)
+    end
+    if dg * T >= b.READY_GREEN * hp then
       return "green"
     end
     local burst = F.Burst(M, S, R)
@@ -335,7 +370,7 @@ do
     if not (total > 0) then
       return 0
     end
-    return F.Gold(s, false, false, M) / (F.HP(s) * F.WaveMult() / total + B().RESPAWN)
+    return F.Gold(s, false, false, M) / (F.HP(s) * F.HardMult(s) / total + B().RESPAWN)
   end
   F.OfflineGold = function(M, S, s, dt)
     local b = B()
@@ -344,6 +379,6 @@ do
       return 0
     end
     local t = math.min(dt, b.OFFLINE_MAX)
-    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) * F.WaveMult() / d + b.RESPAWN)
+    return Ti().OfflineRate() * t * F.Gold(s, false, false, M) / (F.HP(s) * F.HardMult(s) / d + b.RESPAWN)
   end
 end

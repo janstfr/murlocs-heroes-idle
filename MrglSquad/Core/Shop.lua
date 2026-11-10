@@ -128,7 +128,7 @@ do
     return b.CRITM_BASE + b.CRITM_STEP * r
   end
   Sh.ClickFactor = function()
-    return math.min(B().BESTBUY_CLICK_CAP, B().BESTBUY_CLICK_SHARE * Mrgl.Core.Combat.ClickRate())
+    return math.min(B().BESTBUY_CLICK_CAP, B().BESTBUY_CLICK_SHARE * Mrgl.Core.Combat.ClickRate() + Mrgl.Core.Tide.AutoSwing())
   end
   function applyCand(cand)
     local db = Mrgl.db
@@ -437,27 +437,56 @@ do
     end
     return Sh.BuySelf(t.id)
   end
-  Sh.BuyBest = function(auto)
-    local ch = Sh.Chain()
-    if ch == nil or not ch.affordable or ch.n <= 0 then
-      return false
-    end
-    local rt = C.rt
-    rt.chain = true
-    rt.autoBuy = auto == true
-    local k = 0
-    local t = Sh.BestBuy()
-    while k < ch.n and t ~= nil and t.affordable do
-      if not Sh.Do(t) then
+  local function buyCheap()
+    local db = Mrgl.db
+    local n = 0
+    for guard = 1, 18 do
+      local bi, bc = 0, 0
+      for i = 1, Sh.Count() do
+        if Sh.UpgradeUnlocked(i) then
+          local c = F().UpgradeCost(i, db.murlocs[F().Murloc(i).id].u + 1)
+          if c <= B().TIDE_CHEAP_UPG * db.gold and (bi == 0 or c < bc) then
+            bi = i
+            bc = c
+          end
+        end
+      end
+      if bi == 0 or not Sh.BuyUpgrade(F().Murloc(bi).id) then
         break
       end
-      k = k + 1
-      t = Sh.BestBuy()
+      n = n + 1
     end
-    rt.chain = false
+    return n
+  end
+  Sh.BuyBest = function(auto)
+    local rt = C.rt
+    local cheap = 0
+    if Mrgl.Core.Tide.Total() >= 1 then
+      rt.autoBuy = auto == true
+      cheap = buyCheap()
+      rt.autoBuy = false
+    end
+    local ch = Sh.Chain()
+    local k = 0
+    if ch ~= nil and ch.affordable and ch.n > 0 then
+      rt.chain = true
+      rt.autoBuy = auto == true
+      local t = Sh.BestBuy()
+      while k < ch.n and t ~= nil and t.affordable do
+        if not Sh.Do(t) then
+          break
+        end
+        k = k + 1
+        t = Sh.BestBuy()
+      end
+      rt.chain = false
+    elseif cheap <= 0 then
+      return false
+    end
+    rt.autoBuy = auto == true
     Sh.Dirty()
-    C.Fire("BUY_CHAIN", tag({ n = k }))
+    C.Fire("BUY_CHAIN", tag({ n = k + cheap }))
     rt.autoBuy = false
-    return k > 0
+    return k + cheap > 0
   end
 end

@@ -40,6 +40,12 @@ do
   T.Has = function(p, lvl)
     return T.Points(p) >= lvl
   end
+  T.Ms = function(i)
+    return U.At(B().TIDE_MILESTONES, i)
+  end
+  T.HasMs = function(p, i)
+    return T.Points(p) >= T.Ms(i)
+  end
   T.Reached = function()
     local db = Mrgl.db
     local gate = 0
@@ -48,19 +54,33 @@ do
     end
     return math.max(db.maxStage, gate)
   end
-  T.PathFull = function(p)
-    return T.Points(p) >= B().TIDE_PATH_MAX
+  local function pr()
+    return Mrgl.db.prestige
   end
-  T.Full = function()
-    return T.PathFull("m") and T.PathFull("s") and T.PathFull("a")
+  T.Waiting = function()
+    return pr().pts
+  end
+  T.NextPoint = function()
+    local b = B()
+    if pr().mark <= 0 then
+      return b.TIDE_STAGE
+    end
+    return pr().mark + b.TIDE_STEP
+  end
+  T.Chance = function()
+    local b = B()
+    return math.min(1, b.TIDE_CHANCE + b.TIDE_LUCK * pr().dry)
+  end
+  T.Best = function()
+    return math.max(pr().best, T.Reached())
+  end
+  T.CanEmpty = function()
+    return pr().mark >= B().TIDE_STAGE + B().TIDE_STEP
   end
   T.Avail = function()
-    return T.Reached() >= B().TIDE_STAGE and not T.Full()
+    return T.Reached() >= B().TIDE_STAGE and (pr().pts >= 1 or T.CanEmpty())
   end
   T.Blocked = function()
-    if T.Full() then
-      return "full"
-    end
     if C.rt.inCombat then
       return "combat"
     end
@@ -71,6 +91,44 @@ do
   end
   T.Ready = function()
     return T.Avail() and T.Blocked() == nil
+  end
+  T.Check = function()
+    local db = Mrgl.db
+    if db == nil or db.prestige == nil then
+      return
+    end
+    local p = db.prestige
+    local b = B()
+    local r = T.Reached()
+    if p.recShown ~= true and p.prev >= b.TIDE_STAGE and r > p.prev then
+      p.recShown = true
+      C.Fire("RECORD", { stage = r })
+    end
+    local nxt = b.TIDE_STAGE
+    if p.run >= b.TIDE_STAGE then
+      nxt = p.run + b.TIDE_STEP
+    end
+    while r >= nxt do
+      p.run = nxt
+      local got = false
+      local lucky = false
+      if nxt > p.mark then
+        got = true
+        p.mark = nxt
+      elseif nxt >= b.TIDE_STAGE + b.TIDE_STEP then
+        if U.Rand() < T.Chance() then
+          got = true
+          lucky = true
+        end
+      end
+      if got then
+        p.pts = math.min(p.pts + 1, 10000)
+        p.dry = 0
+        C.Fire("TIDE_POINT", { stage = nxt, lucky = lucky })
+        C.Fire("SAVE", {})
+      end
+      nxt = nxt + b.TIDE_STEP
+    end
   end
   local fc = { m = -1, s = -1, a = -1 }
   local function cur()
@@ -86,50 +144,51 @@ do
     m, s, a = T.Points("m"), T.Points("s"), T.Points("a")
     local b = B()
     local tot = m + s + a
+    local cap = b.MULT_CAP
+    local ms1, ms2, ms3, ms4 = T.Ms(1), T.Ms(2), T.Ms(3), T.Ms(4)
     fc.m = m; fc.s = s; fc.a = a
-    fc.floodDmg = 1 + b.TIDE_FLOOD_DMG * tot
-    fc.floodGold = 1 + b.TIDE_FLOOD_GOLD * tot
-    local mp = 1 + b.TIDE_MURLOC * m
-    if m >= 10 then
+    fc.gold = math.min(cap, 1 + b.TIDE_GOLD * tot)
+    local mp = b.TIDE_MURLOC_X ^ m
+    if m >= ms1 then
       mp = mp * 1.5
     end
-    if m >= 100 then
+    if m >= ms4 then
       mp = mp * 2
     end
-    fc.murlocPath = mp
-    fc.murloc = fc.floodDmg * mp
-    local cm = 1 + b.TIDE_CLICK * s
-    if s >= 100 then
+    fc.murloc = math.min(cap, mp)
+    local cm = b.TIDE_CLICK_X ^ s
+    if s >= ms4 then
       cm = cm * 2
     end
-    fc.click = cm
-    local sm = 1 + b.TIDE_SPELL * a
-    if a >= 100 then
+    fc.click = math.min(cap, cm)
+    local sm = b.TIDE_SPELL_X ^ a
+    if a >= ms4 then
       sm = sm * 3
     end
-    fc.spell = sm
+    fc.spell = math.min(cap, sm)
+    fc.echo = s >= 1 or a >= 1
     fc.critPlus = 0
-    if s >= 25 then
+    if s >= ms2 then
       fc.critPlus = 0.10
     end
     fc.critDmgPlus = 0
-    if s >= 50 then
+    if s >= ms3 then
       fc.critDmgPlus = 3
     end
     fc.timerPlus = 0
-    if a >= 25 then
+    if a >= ms2 then
       fc.timerPlus = b.TIDE_TIMER_PLUS
     end
     fc.buff = 1
-    if a >= 100 then
+    if a >= ms4 then
       fc.buff = 2
     end
     fc.offline = b.OFFLINE_RATE
-    if m >= 25 then
+    if m >= ms2 then
       fc.offline = b.TIDE_OFFLINE_RATE
     end
     fc.cost = 1
-    if m >= 50 then
+    if m >= ms3 then
       fc.cost = 1 - b.TIDE_DISCOUNT
     end
     fc.murky = 0
@@ -138,11 +197,8 @@ do
     end
     return fc
   end
-  T.FloodDmg = function()
-    return cur().floodDmg
-  end
-  T.FloodGold = function()
-    return cur().floodGold
+  T.GoldMult = function()
+    return cur().gold
   end
   T.MurlocMult = function()
     return cur().murloc
@@ -160,7 +216,10 @@ do
     if p == "a" then
       return cur().spell
     end
-    return cur().murlocPath
+    return cur().murloc
+  end
+  T.EchoFloor = function()
+    return cur().echo
   end
   T.CritPlus = function()
     return cur().critPlus
@@ -169,13 +228,20 @@ do
     return cur().critDmgPlus
   end
   T.AutoCps = function()
-    if T.Has("s", 100) then
+    if T.HasMs("s", 4) then
       return B().TIDE_AUTOCLICK_CPS_MAX
     end
-    if T.Has("s", 10) then
+    if T.HasMs("s", 1) then
       return B().TIDE_AUTOCLICK_CPS
     end
     return 0
+  end
+  T.AutoSwing = function()
+    local db = Mrgl.db
+    if db == nil or db.settings == nil or db.settings.autoclick ~= true then
+      return 0
+    end
+    return T.AutoCps()
   end
   T.TimerPlus = function()
     return cur().timerPlus
@@ -217,19 +283,22 @@ do
     end
     return nil
   end
-  T.Gains = function(p)
+  T.Gains = function(p, n)
     local out = {}
     local d = T.Path(p)
     if d == nil then
       return out
     end
+    if n == nil then
+      n = math.max(1, T.Waiting())
+    end
     if T.Total() == 0 then
       U.Insert(out, "first")
     end
-    local n = T.Points(p) + 1
+    local old = T.Points(p)
     for i = 1, U.Len(d.ms) do
       local ms = U.At(d.ms, i)
-      if ms.at == n then
+      if ms.at > old and ms.at <= old + n then
         U.Insert(out, ms.id)
       end
     end
@@ -261,10 +330,10 @@ do
     if slot == 1 and T.Total() >= 1 then
       return T.Def("murky")
     end
-    if slot == 2 and T.Has("m", 10) then
+    if slot == 2 and T.HasMs("m", 1) then
       return T.Def("m10")
     end
-    if slot == 3 and T.Has("m", 100) then
+    if slot == 3 and T.HasMs("m", 4) then
       return T.Def("m100")
     end
     return nil
@@ -274,10 +343,10 @@ do
       return T.AutoBuy()
     end
     if key == "autoclick" then
-      return T.Has("s", 10)
+      return T.HasMs("s", 1)
     end
     if key == "autocast" then
-      return T.Has("a", 10)
+      return T.HasMs("a", 1)
     end
     return false
   end
@@ -291,62 +360,7 @@ do
     return s[key]
   end
   T.Trophy = function(id)
-    local db = Mrgl.db
-    if id == "nef" and T.NefCount() > 0 then
-      return true
-    end
-    return db.prestige.trophies[id] == true
-  end
-  T.Wave = function()
-    local b = B()
-    return math.min(b.TIDE_WAVE_END / b.TIDE_WAVE, math.floor(T.Total() / b.TIDE_WAVE) + 1)
-  end
-  local function nefw()
-    return Mrgl.db.prestige.trophies.nefw
-  end
-  T.NefCount = function()
-    local s, c = nefw(), 0
-    for i = 1, string.len(s) do
-      if string.sub(s, i, i) == "1" then
-        c = c + 1
-      end
-    end
-    return c
-  end
-  T.NefThisWave = function()
-    local w = T.Wave()
-    return string.sub(nefw(), w, w) == "1"
-  end
-  T.NefMissed = function()
-    local s, c = nefw(), 0
-    for i = 1, T.Wave() - 1 do
-      if string.sub(s, i, i) ~= "1" then
-        c = c + 1
-      end
-    end
-    return c
-  end
-  T.NefWin = function()
-    local tr = Mrgl.db.prestige.trophies
-    local s = tr.nefw
-    local w = T.Wave()
-    local k = 0
-    if string.sub(s, w, w) ~= "1" then
-      k = w
-    else
-      for i = 1, w - 1 do
-        if string.sub(s, i, i) ~= "1" then
-          k = i
-          break
-        end
-      end
-    end
-    if k == 0 then
-      return 0
-    end
-    tr.nefw = string.sub(s, 1, k - 1) .. "1" .. string.sub(s, k + 1)
-    tr.nef = true
-    return k
+    return Mrgl.db.prestige.trophies[id] == true
   end
   T.Rise = function(path, committed)
     local db = Mrgl.db
@@ -356,17 +370,33 @@ do
     if committed == true and bl == "combat" and not db.boss.active then
       bl = nil
     end
-    if not T.Avail() or bl ~= nil or not T.IsPath(path) or T.PathFull(path) then
+    if not T.Avail() or bl ~= nil then
       return false
     end
-    local pr = db.prestige
+    local pe = db.prestige
+    local n = pe.pts
+    if n >= 1 and not T.IsPath(path) then
+      return false
+    end
     local reached = T.Reached()
-    local old = pr.paths[path]
-    local ms = T.Gains(path)
-    pr.paths[path] = old + 1
-    pr.count = pr.count + 1
-    pr.last = path
-    pr.best = math.max(pr.best, reached)
+    local p = "none"
+    local old = 0
+    local ms = {}
+    if n >= 1 then
+      p = path
+      old = pe.paths[path]
+      ms = T.Gains(path, n)
+      pe.paths[path] = old + n
+      pe.last = path
+    else
+      pe.dry = math.min(pe.dry + 1, 100)
+    end
+    pe.pts = 0
+    pe.count = pe.count + 1
+    pe.best = math.max(pe.best, reached)
+    pe.prev = pe.best
+    pe.recShown = false
+    pe.run = 0
     db.gold = b.START_GOLD
     db.stage = 1
     db.kills = 0
@@ -399,8 +429,9 @@ do
     rt.autoClickAcc = 0
     rt.leeroyHit = 0
     rt.leeroyLine = 0
+    rt.spill = 0
     Mrgl.Core.Shop.Dirty()
-    C.Fire("TIDE", { path = path, old = old, new = old + 1, total = T.Total(), milestones = ms })
+    C.Fire("TIDE", { path = p, old = old, new = old + n, total = T.Total(), milestones = ms, points = n })
     C.Fire("STAGE", { stage = 1 })
     C.Fire("ZONE", { zone = 1, name = Cb().Zone(1).name })
     C.Fire("SAVE", {})
@@ -424,17 +455,36 @@ do
   end
   T.AutoCastOn = function()
     local db = Mrgl.db
-    return T.Has("a", 10) and db.settings.autocast == true and not C.rt.inCombat
+    return T.HasMs("a", 1) and db.settings.autocast == true and not C.rt.inCombat
   end
   T.BossOpen = function()
     if T.AutoCastOn() then
       autoCast()
     end
   end
+  local function spill()
+    local db = Mrgl.db
+    local rt = C.rt
+    if not (rt.spill > 0) or rt.respawn > 0 or not (db.enemyHp > 0) then
+      return
+    end
+    if db.boss.active and rt.inCombat then
+      return
+    end
+    local room = math.max(0, db.enemyHp - rt.enemyBank)
+    if room <= 0 then
+      return
+    end
+    local take = math.min(rt.spill, room)
+    rt.spill = rt.spill - take
+    Cb().Hit(take, "spill", false, 1)
+  end
   T.Step = function(dt)
     local db = Mrgl.db
     local rt = C.rt
     local b = B()
+    T.Check()
+    spill()
     local cps = T.AutoCps()
     if cps > 0 and db.settings.autoclick == true then
       rt.autoClickAcc = rt.autoClickAcc + dt * cps

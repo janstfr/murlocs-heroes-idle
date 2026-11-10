@@ -890,7 +890,7 @@ do
     end
   end
   M.AnyfinShown = function()
-    return Core().Tide.Has("a", 50) and st.anyfinHold ~= true
+    return Core().Tide.HasMs("a", 3) and st.anyfinHold ~= true
   end
   function buildAbility(parent, i)
     local d = U.At(Mrgl.Data.Abilities, i)
@@ -1290,7 +1290,7 @@ do
       w.stage:SetText(stageStr)
     end
     local gate = Cb.GateOpen()
-    local mark = Core().Tide.Avail() and not db.boss.active
+    local mark = Core().Tide.Avail() and Core().Tide.Waiting() >= 1 and not db.boss.active
     if mark ~= w.tideMark:IsShown() then
       w.tideMark:SetShown(mark)
       if mark then
