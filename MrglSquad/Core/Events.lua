@@ -52,6 +52,7 @@ do
       opener = {},
       openerT = 0,
       whelpAcc = 0,
+      spill = 0,
       squadDealt = 0,
       combatGold = 0,
       bossSec = 0,

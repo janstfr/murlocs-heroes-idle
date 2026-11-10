@@ -58,7 +58,8 @@ do
     if not db.settings.autofight then
       return { state = "off", left = 0 }
     end
-    if Bo.Ready() ~= "green" then
+    local rd = Bo.Ready()
+    if rd ~= "green" and not (rd == "greenAbil" and Mrgl.Core.Tide.AutoCastOn()) then
       return { state = "none", left = 0 }
     end
     if Bo.Held() then
@@ -128,11 +129,10 @@ do
     db.boss.resetStage = 0
     db.autoFailDps[bs] = nil
     C.Fire("BOSS_WIN", { stage = bs, name = e.name, gold = gold })
-    if F().ZoneIndex(bs) == 11 and F().IsZoneBoss(bs) then
-      local hw = Mrgl.Core.Tide.NefWin()
-      if hw > 0 then
-        C.Fire("TROPHY", { id = "nef", wave = hw })
-      end
+    local tr = db.prestige.trophies
+    if F().ZoneIndex(bs) == 11 and F().IsZoneBoss(bs) and tr.nef ~= true then
+      tr.nef = true
+      C.Fire("TROPHY", { id = "nef" })
     end
     Cb().SetStage(bs + 1)
     Mrgl.Core.Abilities.CheckUnlock()

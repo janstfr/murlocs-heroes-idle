@@ -202,7 +202,7 @@ do
         end
       else
         if dmg == nil then
-          dmg = Cb.ClickDamage()
+          dmg = math.min(B().HP_CAP, Cb.ClickDamage() * Mrgl.Core.Tide.SpellMult())
           cc = Cb.CritChance("whelp")
           cm = F().CritMult(db.self)
         end
@@ -247,7 +247,7 @@ do
       if rt.killSet == true then
         return
       end
-      local dmg = Cb.ClickDamage()
+      local dmg = math.min(B().HP_CAP, Cb.ClickDamage() * Mrgl.Core.Tide.SpellMult())
       local cc = Cb.CritChance("whelp")
       local cm = F().CritMult(db.self)
       local avg = dmg * (1 + cc * (cm - 1))
@@ -337,7 +337,17 @@ do
     if rt.respawn > 0 then
       return false
     end
-    if kind == "auto" then
+    if amount > B().HP_CAP then
+      amount = B().HP_CAP
+    end
+    if (kind == "mrgl" or kind == "leeroy") and Mrgl.Core.Tide.Points("a") >= 1 then
+      local room = math.max(0, db.enemyHp - rt.enemyBank)
+      if amount > room then
+        rt.spill = math.min(B().HP_CAP, rt.spill + (amount - room))
+        amount = room
+      end
+    end
+    if kind == "auto" or kind == "spill" then
       rt.squadDealt = rt.squadDealt + math.min(amount, math.max(0, db.enemyHp - rt.enemyBank))
     end
     Cb.Damage(amount, goldMult, kind)

@@ -1275,6 +1275,10 @@ do
     if not td.rising or not visible() or bn.min() then
       return
     end
+    if p.points == 0 then
+      J.Headline("tide", S().TIDE_HEAD_NONE)
+      return
+    end
     J.Headline("tide", U.Fill(S().TIDE_HEAD, { path = td.pathName(p.path), n = p.new }))
     for k = 1, U.Len(ms) do
       local id = U.At(ms, k)
@@ -1286,10 +1290,6 @@ do
       else
         td.line(Td.Def(id), id)
       end
-    end
-    local wv = Mrgl.UI.Tips.TideWaveJump()
-    if wv ~= nil then
-      J.Headline("tide", U.Fill(S().TIDE_WAVE_HEAD, { n = wv }))
     end
   end
   td.line = function(d, id)
@@ -1380,6 +1380,22 @@ do
       return
     end
     J.Headline("tide", S().NEF_HEAD)
+  end
+  td.calmLine = function(text)
+    if Core().rt.quiet == true or not bn.canPlay() or bn.min() then
+      return
+    end
+    J.Headline("tide", text)
+  end
+  td.onRecord = function(p)
+    td.calmLine(U.Fill(S().TIDE_RECORD_HEAD, { s = p.stage }))
+  end
+  td.onPoint = function(p)
+    local key = "TIDE_POINT_HEAD"
+    if p.lucky == true then
+      key = "TIDE_LUCKY_HEAD"
+    end
+    td.calmLine(U.Fill(S()[key], { s = p.stage }))
   end
   J.DebugTide = function()
     if not visible() or bn.min() then
@@ -1892,6 +1908,12 @@ do
     end)
     On("TROPHY", function(p)
       td.onTrophy(p)
+    end)
+    On("RECORD", function(p)
+      td.onRecord(p)
+    end)
+    On("TIDE_POINT", function(p)
+      td.onPoint(p)
     end)
     On("HIT", function(p)
       if p.kind == "auto" or not visible() then

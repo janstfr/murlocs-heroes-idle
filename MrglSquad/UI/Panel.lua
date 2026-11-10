@@ -748,7 +748,7 @@ do
     return false
   end
   function tideDot()
-    return (Ti().Avail() and not Mrgl.db.boss.active) or anyNew()
+    return (Ti().Avail() and Ti().Waiting() >= 1 and not Mrgl.db.boss.active) or anyNew()
   end
   P.TideDot = tideDot
   function tideLeave()
@@ -819,31 +819,14 @@ do
     tw.wave = K().Text(tw.icon, K().ARIALN, 10, C().white, "OUTLINE", "OVERLAY")
     tw.wave:SetPoint("BOTTOMRIGHT", tw.icon, "BOTTOMRIGHT", -1, 2)
     tw.wave:SetJustifyH("RIGHT")
-    tw.best = CreateFrame("Frame", "MrglSquadTideBest", pg)
-    tw.best:SetSize(28, 12)
-    tw.best:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -67)
-    tw.best.text = K().Text(tw.best, K().ARIALN, 10, C().muted, "")
-    tw.best.text:SetPoint("CENTER", tw.best, "CENTER", 0, 0)
-    tw.best.text:SetJustifyH("CENTER")
+    tw.best = CreateFrame("Button", "MrglSquadTideBest", pg)
+    tw.best:SetSize(84, 16)
+    tw.best:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -36)
+    tw.best.text = K().Text(tw.best, K().FRIZ, 13, C().gold, "")
+    tw.best.text:SetPoint("LEFT", tw.best, "LEFT", 0, 0)
+    tw.best.text:SetJustifyH("LEFT")
     K().Tip(tw.best, function(tt)
       Tips().TideBest(tt)
-    end)
-    local fl = CreateFrame("Button", "MrglSquadTideFlood", pg)
-    tw.flood = fl
-    fl:SetSize(84, 14)
-    fl:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -37)
-    fl.mur = K().Icon(fl, U.At(D.paths, 1).icon, "ARTWORK")
-    fl.mur:SetSize(12, 12)
-    fl.mur:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -38)
-    fl.d = K().Text(fl, K().ARIALN, 12, C().white, "OUTLINE")
-    fl.d:SetPoint("LEFT", fl.mur, "RIGHT", 2, 0)
-    fl.coin = K().Icon(fl, Mrgl.Data.Icons.coin, "ARTWORK")
-    fl.coin:SetSize(12, 12)
-    fl.coin:SetPoint("LEFT", fl.d, "RIGHT", 6, 0)
-    fl.g = K().Text(fl, K().ARIALN, 12, C().white, "OUTLINE")
-    fl.g:SetPoint("LEFT", fl.coin, "RIGHT", 2, 0)
-    K().Tip(fl, function(tt)
-      Tips().TideFlood(tt)
     end)
     tw.quarter = tideBox(pg, "MrglSquadTideQuarter", 16, U.At(D.first, 1).icon, true)
     tw.quarter:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -56)
@@ -859,9 +842,6 @@ do
     K().Tip(tw.nef, function(tt)
       Tips().TideTrophy(tt, 1)
     end)
-    tw.nefN = K().Text(tw.nef, K().ARIALN, 9, C().white, "OUTLINE", "OVERLAY")
-    tw.nefN:SetPoint("BOTTOMRIGHT", tw.nef, "BOTTOMRIGHT", 0, 1)
-    tw.nefN:SetJustifyH("RIGHT")
     tw.coming = {}
     for j = 1, U.Len(D.coming) do
       local cb = tideBox(pg, "MrglSquadTideComing" .. j, 16, U.At(D.coming, j).icon)
@@ -973,19 +953,16 @@ do
   end
   function tideReason()
     local S = Mrgl.Data.Strings
-    if Tips().TideAllFull() then
-      return { text = S.TIDE_ALL_MAX, c = C().muted }
-    end
     if Core().rt.inCombat == true then
       return { text = S.TIDE_NO_COMBAT, c = C().muted }
     end
     if Mrgl.db.boss.active then
       return { text = S.TIDE_AFTER_BOSS, c = C().muted }
     end
-    if not Ti().Avail() then
+    if Ti().Reached() < Mrgl.Data.Balance.TIDE_STAGE then
       return { text = U.Fill(S.TIDE_REACH, { s = Mrgl.Data.Balance.TIDE_STAGE }), c = C().muted }
     end
-    return { text = S.TIDE_READY, c = C().good }
+    return { text = U.Fill(S.TIDE_NEXT_PT, { m = Ti().NextPoint() }), c = C().muted }
   end
   P.TideReason = tideReason
   function fillTide()
@@ -1001,27 +978,26 @@ do
     else
       tw.icon:SetAlpha(1)
     end
-    local fc = C().white
-    if total <= 0 then
-      fc = C().muted
+    local best = T.Best()
+    tw.best.text:SetText(U.Fill(S.TIDE_BEST, { s = best }))
+    if best >= Mrgl.Data.Balance.TIDE_STAGE then
+      K().SetTextColor(tw.best.text, C().gold)
+    else
+      K().SetTextColor(tw.best.text, C().muted)
     end
-    tw.flood.d:SetText(U.Fill(S.TIDE_FLOOD_X, { x = U.Short(T.FloodDmg()) }))
-    tw.flood.g:SetText(U.Fill(S.TIDE_FLOOD_X, { x = U.Short(T.FloodGold()) }))
-    K().SetTextColor(tw.flood.d, fc)
-    K().SetTextColor(tw.flood.g, fc)
     lockLook(tw.quarter, total >= 1, db.settings[U.At(Mrgl.Data.Tide.first, 1).toggle] ~= false, nw.first == true)
-    local nefs = Tips().NefCount()
-    lockLook(tw.nef, nefs > 0, true, nw.nef == true)
-    tw.nefN:SetText("" .. nefs)
-    tw.nefN:SetShown(nefs > 0)
-    local wave = Tips().TideWave()
-    tw.wave:SetText("" .. wave)
-    tw.wave:SetShown(wave >= 2)
-    tw.best:SetShown(db.prestige.count >= 1)
-    tw.best.text:SetText("" .. db.prestige.best)
+    lockLook(tw.nef, T.Trophy("nef"), true, nw.nef == true)
+    local pts = T.Waiting()
+    tw.wave:SetText("" .. pts)
+    tw.wave:SetShown(pts >= 1)
     local b = tw.btn
-    if T.Ready() and not Tips().TideAllFull() then
-      b.text:SetText(S.TIDE_BUTTON)
+    if T.Ready() and pts >= 1 then
+      b.text:SetText(U.Fill(S.TIDE_BUTTON, { n = pts }))
+      K().SetTextColor(b.text, C().gold)
+      b.edge:SetColor(C().gold)
+      b:SetAlpha(1)
+    elseif T.Ready() then
+      b.text:SetText(S.TIDE_BUTTON_LOCKED)
       K().SetTextColor(b.text, C().gold)
       b.edge:SetColor(C().gold)
       b:SetAlpha(1)

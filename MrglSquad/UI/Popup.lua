@@ -2,7 +2,7 @@ local ADDON, Mrgl = ...
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, Tips, Panel, readinessColor, rowY, toggleRow, textButton, label, screenPos
-  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill, tideCover, openPath
+  local welcomeOpen, tideSmall, tideText, tideRow, tideKeepLayout, pathIndex, tideFill, tideCover, gainNames
   local Po = {}
   Mrgl.UI.Popup = Po
   local U = Mrgl.U
@@ -256,7 +256,7 @@ do
     title:SetPoint("TOP", p, "TOP", 0, -12)
     title:SetJustifyH("CENTER")
     title:SetText(S.TIDE_POP_TITLE)
-    tideText(p, 12, C().muted, -34, S.TIDE_CHOOSE)
+    tp.choose = tideText(p, 12, C().muted, -34, S.TIDE_CHOOSE)
     for i = 1, U.Len(D.paths) do
       local d = U.At(D.paths, i)
       local b = CreateFrame("Button", "MrglSquadTidePick" .. i, p)
@@ -292,7 +292,7 @@ do
     end
     tp.rank = tideText(p, 14, C().text, -138)
     tp.ms = tideText(p, 12, C().good, -158)
-    tideText(p, 12, C().good, -176, S.TIDE_POP_FLOOD)
+    tp.gold = tideText(p, 12, C().good, -176, S.TIDE_POP_GOLD)
     tp.keepL = K().Text(p, K().ARIALN, 11, C().muted, "")
     tp.keepL:SetText(S.TIDE_KEEP)
     tp.resetL = K().Text(p, K().ARIALN, 11, C().muted, "")
@@ -400,39 +400,55 @@ do
     end
     return 0
   end
-  function openPath(id)
-    if not Tips().TidePathFull(id) then
-      return id
-    end
-    local paths = Mrgl.Data.Tide.paths
-    for i = 1, U.Len(paths) do
-      if not Tips().TidePathFull(U.At(paths, i).id) then
-        return U.At(paths, i).id
+  function gainNames(id, n)
+    local Td = Core().Tide
+    local D = Mrgl.Data.Tide
+    local g = Td.Gains(id, n)
+    local out = ""
+    for i = 1, U.Len(g) do
+      local x = U.At(g, i)
+      local nm
+      if x == "first" then
+        nm = U.At(D.first, 1).name .. " · " .. U.At(D.first, 2).name
+      else
+        nm = Td.Def(x).name
+      end
+      if out == "" then
+        out = nm
+      else
+        out = out .. " · " .. nm
       end
     end
-    return id
+    return out
   end
   function tideFill()
     local S = Mrgl.Data.Strings
     local D = Mrgl.Data.Tide
     local pr = Mrgl.db.prestige
-    local first = pr.count <= 0
+    local n = Core().Tide.Waiting()
+    local none = n <= 0
+    if n == 1 then
+      tp.choose:SetText(S.TIDE_CHOOSE)
+    elseif n > 1 then
+      tp.choose:SetText(U.Fill(S.TIDE_CHOOSE_N, { n = n }))
+    else
+      tp.choose:SetText(S.TIDE_NO_PT)
+    end
     for i = 1, U.Len(tp.picks) do
       local b = U.At(tp.picks, i)
       local on = b.id == tp.path
-      local full = Tips().TidePathFull(b.id)
-      b.sel:SetShown(on and not full)
-      b.edge:SetShown(not on or full)
-      b.icon:SetDesaturated(full)
-      b:SetEnabled(not full)
-      if full then
+      b.sel:SetShown(on and not none)
+      b.edge:SetShown(not on or none)
+      b.icon:SetDesaturated(none)
+      b:SetEnabled(not none)
+      if none then
         b:SetAlpha(0.35)
       elseif on then
         b:SetAlpha(1)
       else
         b:SetAlpha(0.6)
       end
-      if full then
+      if none then
         b.tag:SetAlpha(0.35)
         b.tag2:SetAlpha(0.35)
       else
@@ -443,33 +459,34 @@ do
     local pi = pathIndex(tp.path)
     local p = U.At(D.paths, pi)
     local old = pr.paths[p.id]
-    tp.rank:SetText(U.Fill(S.TIDE_POP_RANK, { path = p.name, old = old, ["new"] = old + 1 }))
-    local hit
-    for k = 1, U.Len(p.ms) do
-      if U.At(p.ms, k).at == old + 1 then
-        hit = U.At(p.ms, k)
+    if none then
+      local luck = S.TIDE_LUCK_LINE
+      if pr.mark <= Mrgl.Data.Balance.TIDE_STAGE + Mrgl.Data.Balance.TIDE_STEP then
+        luck = S.TIDE_LUCK_ONE
       end
-    end
-    if hit ~= nil then
-      tp.ms:SetText(U.Fill(S.TIDE_POP_NEW, { name = hit.name }))
-      K().SetTextColor(tp.ms, C().good)
-    elseif first then
-      tp.ms:SetText(U.Fill(S.TIDE_POP_NEW, { name = U.At(D.first, 1).name .. " · " .. U.At(D.first, 2).name }))
-      K().SetTextColor(tp.ms, C().good)
+      tp.rank:SetText(U.Fill(luck, { c = math.floor(Core().Tide.Chance() * 100 + 0.5), m = pr.mark }))
+      tp.ms:SetText("")
     else
-      local nx = Tips().TideNextMs(pi)
-      if nx ~= nil then
-        tp.ms:SetText(U.Fill(S.TIDE_POP_NEXT, { name = nx.name, r = nx.at }))
+      tp.rank:SetText(U.Fill(S.TIDE_POP_RANK, { path = p.name, old = old, ["new"] = old + n }))
+      local names = gainNames(p.id, n)
+      if names ~= "" then
+        tp.ms:SetText(U.Fill(S.TIDE_POP_NEW, { name = names }))
+        K().SetTextColor(tp.ms, C().good)
       else
-        tp.ms:SetText(S.TIDE_ALL_MS)
+        local nx = Tips().TideNextMs(pi)
+        if nx ~= nil then
+          tp.ms:SetText(U.Fill(S.TIDE_POP_NEXT, { name = nx.name, r = nx.at }))
+        else
+          tp.ms:SetText(S.TIDE_ALL_MS)
+        end
+        K().SetTextColor(tp.ms, C().muted)
       end
-      K().SetTextColor(tp.ms, C().muted)
     end
+    tp.gold:SetShown(not none)
     K().SetIcon(tp.go.icon, p.icon)
+    tp.go.icon:SetShown(not none)
     local inC = Core().rt.inCombat == true
     tp.inC = inC
-    local wv = Tips().TideWaveNext()
-    K().SetTextColor(tp.forever, C().muted)
     if inC then
       tp.go:SetAlpha(0.45)
       tp.go:Disable()
@@ -477,9 +494,8 @@ do
     else
       tp.go:SetAlpha(1)
       tp.go:Enable()
-      if wv ~= nil then
-        tp.forever:SetText(U.Fill(S.TIDE_WAVE_WARN, { n = wv }))
-        K().SetTextColor(tp.forever, C().gold)
+      if none then
+        tp.forever:SetText(S.TIDE_NOPT_FOREVER)
       else
         tp.forever:SetText(S.TIDE_FOREVER)
       end
@@ -497,7 +513,6 @@ do
     if pr.count <= 0 or pathIndex(tp.path) <= 0 then
       tp.path = "m"
     end
-    tp.path = openPath(tp.path)
     tp.open = true
     tp.cover = ""
     tideCover()
@@ -514,7 +529,7 @@ do
     return tp.open
   end
   Po.TidePick = function(id)
-    if not tp.open or pathIndex(id) <= 0 or Tips().TidePathFull(id) then
+    if not tp.open or pathIndex(id) <= 0 or Core().Tide.Waiting() <= 0 then
       return
     end
     tp.path = id

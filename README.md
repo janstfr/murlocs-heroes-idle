@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>A murloc squad fights in a small window while you quest.</b><br>
-  An idle clicker addon for WoW Forever.
+  An idle clicker addon for WoW Forever. How far can your squad get?
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 - **Bosses.** From Hogger to Ragnaros and Nefarian, one at the end of each zone.
 - **King Mrgl-Mrgl.** He waits at stage 50.
 - **Rares.** Find two named rares in every zone.
-- **New Tide.** Start over stronger and pick one of three paths.
+- **New Tide.** Stuck? Start over with your Tide points and get much further.
 - **Your adventure counts.** Quests, level-ups and new zones give the squad bonus gold.
 - **Offline gold.** Logged out? Your squad still earns gold at half speed, for up to 8 hours.
 
@@ -29,6 +29,14 @@
   <img src=".github/media/boss.png" width="260" alt="Boss fight against Hogger">
   <img src=".github/media/minimized.png" width="260" alt="Minimized to a slim bar">
 </p>
+
+## How to play
+
+1. Click the enemy and hire your first murloc.
+2. Keep hiring. **Buy best** picks the best deal for you.
+3. Beat the boss at the end of each zone, up to Ragnaros at stage 100.
+4. The first time you reach stage 100, 120, 140 and so on, you earn a **Tide point**.
+5. Stuck at a boss? Start a **New Tide**. Put your points into Murlocs, Self-Click or Spells, start over much stronger and beat your record.
 
 ## Plays inside WoW
 

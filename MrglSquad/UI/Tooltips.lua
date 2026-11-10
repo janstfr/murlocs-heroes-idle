@@ -2,7 +2,7 @@ local ADDON, Mrgl = ...
 Mrgl.UI = Mrgl.UI or {}
 do
   local K, S, Core, F, title, line, double, w, g, exactUp, gainTok, costTok, upgEffect
-  local toggleLine, nextLine, nefw
+  local toggleLine, nextLine
   local T = {}
   Mrgl.UI.Tips = T
   local U = Mrgl.U
@@ -98,11 +98,15 @@ do
     if db.prestige.count >= 1 then
       line(tt, U.Fill(S().STAGE_TIDE, { n = db.prestige.count }), K().C.muted)
     end
+    local best = Core().Tide.Best()
+    if db.prestige.count >= 1 or best >= Mrgl.Data.Balance.TIDE_STAGE then
+      line(tt, U.Fill(S().TIDE_BEST, { s = w(best) }), K().C.white)
+    end
     T.StageRares(tt, Cb.Zone(db.stage))
     local rc = T.RareCount()
     line(tt, U.Fill(S().STAGE_RARES, { n = U.At(rc, 1), max = U.At(rc, 2) }), K().C.muted)
     if Cb.Zone(db.stage).id == "blackwing" then
-      if not T.NefThis() then
+      if not Core().Tide.Trophy("nef") then
         line(tt, S().NEF_STAGE_TIP, K().C.muted)
       end
       line(tt, S().STAGE_COMING, K().C.muted)
@@ -516,100 +520,10 @@ do
   end
   local TIDE_EFF = { m = "TIDE_EFFECT_M", s = "TIDE_EFFECT_S", a = "TIDE_EFFECT_A" }
   T.TideMult = function(id)
-    local Td = Core().Tide
-    if id == "m" then
-      return Td.PathMult("m")
-    end
-    if id == "s" then
-      return Td.ClickMult()
-    end
-    return Td.SpellMult()
+    return Core().Tide.PathMult(id)
   end
   T.TideEffect = function(id)
     return U.Fill(S()[TIDE_EFF[id]], { x = U.Short(T.TideMult(id)) })
-  end
-  local WAVES, PATH_MAX = 30, 100
-  T.TideWave = function()
-    local Td = Core().Tide
-    if Td.Wave ~= nil then
-      return Td.Wave()
-    end
-    return math.min(WAVES, math.floor(Mrgl.db.prestige.count / 10) + 1)
-  end
-  T.TidePathFull = function(id)
-    local Td = Core().Tide
-    if Td.PathFull ~= nil then
-      return Td.PathFull(id) == true
-    end
-    return Mrgl.db.prestige.paths[id] >= PATH_MAX
-  end
-  T.TideAllFull = function()
-    local Td = Core().Tide
-    if Td.Full ~= nil then
-      return Td.Full() == true
-    end
-    return T.TidePathFull("m") and T.TidePathFull("s") and T.TidePathFull("a")
-  end
-  function nefw()
-    local nw = Mrgl.db.prestige.trophies.nefw
-    if type(nw) == "string" then
-      return nw
-    end
-    return ""
-  end
-  T.NefCount = function()
-    local Td = Core().Tide
-    if Td.NefCount ~= nil then
-      return Td.NefCount()
-    end
-    local nw, n = nefw(), 0
-    for i = 1, string.len(nw) do
-      if string.sub(nw, i, i) == "1" then
-        n = n + 1
-      end
-    end
-    if nw == "" and Mrgl.db.prestige.trophies.nef == true then
-      n = 1
-    end
-    return n
-  end
-  T.NefThis = function()
-    local Td = Core().Tide
-    if Td.NefThisWave ~= nil then
-      return Td.NefThisWave() == true
-    end
-    local nw, k = nefw(), T.TideWave()
-    if nw == "" then
-      return k == 1 and Mrgl.db.prestige.trophies.nef == true
-    end
-    return string.sub(nw, k, k) == "1"
-  end
-  T.NefMissed = function()
-    local Td = Core().Tide
-    if Td.NefMissed ~= nil then
-      return Td.NefMissed()
-    end
-    local nw, n = nefw(), 0
-    for i = 1, T.TideWave() - 1 do
-      if string.sub(nw, i, i) == "0" then
-        n = n + 1
-      end
-    end
-    return n
-  end
-  T.TideWaveNext = function()
-    local n = Mrgl.db.prestige.count
-    if n % 10 == 9 and n < 299 then
-      return math.floor((n + 1) / 10) + 1
-    end
-    return nil
-  end
-  T.TideWaveJump = function()
-    local n = Mrgl.db.prestige.count
-    if n > 0 and n < 300 and n % 10 == 0 then
-      return T.TideWave()
-    end
-    return nil
   end
   T.TideMsState = function(i, k)
     local p = U.At(Mrgl.Data.Tide.paths, i)
@@ -669,12 +583,13 @@ do
     end
     line(tt, p.per, K().C.tipText, true)
     if n > 0 then
-      line(tt, U.Fill(S().TIDE_NOW, { effect = T.TideEffect(p.id) }), K().C.good)
+      line(tt, U.Fill(S().TIDE_PATH_BONUS, { effect = T.TideEffect(p.id) }), K().C.good)
     end
+    if p.id == "s" or p.id == "a" then
+      line(tt, S().TIDE_ECHO_FLOOR_TIP, K().C.muted, true)
+    end
+    line(tt, Mrgl.Data.Tide.gold, K().C.muted, true)
     nextLine(tt, i)
-    if T.TidePathFull(p.id) then
-      line(tt, S().TIDE_MAX_SHORT, K().C.good)
-    end
     if i == 1 and Core().Tide.Total() <= 0 then
       line(tt, S().TIDE_RECOMMENDED, K().C.gold, true)
     end
@@ -710,35 +625,21 @@ do
   T.TideTrophy = function(tt, j)
     local d = U.At(Mrgl.Data.Tide.trophies, j)
     title(tt, d.name)
-    line(tt, U.Fill(S().NEF_WAVES, { n = T.NefCount(), max = WAVES }))
-    if T.NefThis() then
-      line(tt, S().NEF_THIS_DONE, K().C.good)
+    if Core().Tide.Trophy(d.id) then
+      line(tt, d.done, K().C.good)
     else
-      line(tt, S().NEF_THIS_NEED, K().C.muted, true)
+      line(tt, d.need, K().C.muted)
     end
-    if T.NefMissed() > 0 then
-      line(tt, S().NEF_MISSED, K().C.muted, true)
-    end
-    line(tt, S().NEF_ONE, K().C.muted)
-  end
-  T.TideFlood = function(tt)
-    local Td = Core().Tide
-    title(tt, S().TIDE_FLOOD_TITLE)
-    line(tt, U.Fill(S().TIDE_FLOOD_ANY, { d = U.Short(Td.FloodDmg()), g = U.Short(Td.FloodGold()) }), K().C.good, true)
-    line(tt, U.Fill(S().TIDE_COUNT, { n = Mrgl.db.prestige.count }), K().C.muted)
+    line(tt, S().NEF_SHOW, K().C.muted)
   end
   T.TideButton = function(tt)
     title(tt, S().TAB_TIDE)
     line(tt, S().TIDE_BTN_TIP, K().C.tipText, true)
     local Td = Core().Tide
-    if T.TideAllFull() then
-      line(tt, S().TIDE_ALL_MAX, K().C.muted)
-      return
-    end
     if Td.Ready() then
       return
     end
-    if Core().rt.inCombat ~= true and not Mrgl.db.boss.active and not Td.Avail() then
+    if Core().rt.inCombat ~= true and not Mrgl.db.boss.active and Td.Reached() < Mrgl.Data.Balance.TIDE_STAGE then
       line(tt, U.Fill(S().TIDE_REACH_TIP, { s = Mrgl.Data.Balance.TIDE_STAGE }), K().C.muted, true)
       line(tt, S().TIDE_NO_KILL, K().C.muted)
     else
@@ -751,25 +652,25 @@ do
     line(tt, S().TIDE_MARK_TIP, K().C.muted)
   end
   T.TideHead = function(tt)
+    local Td = Core().Tide
+    local n = Td.Waiting()
     title(tt, S().TAB_TIDE)
-    line(tt, S().TAB_TIDE_TIP, K().C.tipText, true)
-    line(tt, S().TIDE_NO_KILL, K().C.muted)
-    local k = T.TideWave()
-    line(tt, U.Fill(S().TIDE_WAVE, { n = k, max = WAVES }), K().C.white)
-    if k <= 1 then
-      line(tt, S().TIDE_WAVE_1, K().C.muted, true)
-      return
+    if n == 1 then
+      line(tt, S().TIDE_PT_WAITING, K().C.white)
+    elseif n > 1 then
+      line(tt, U.Fill(S().TIDE_PTS_WAITING, { n = w(n) }), K().C.white)
+    else
+      line(tt, S().TIDE_NO_PT, K().C.muted)
     end
-    if not T.TideAllFull() then
-      line(tt, S().TIDE_WAVE_HARD, K().C.muted, true)
-    end
-    if k < WAVES then
-      line(tt, U.Fill(S().TIDE_WAVE_NEXT, { n = k * 10 }), K().C.muted)
-    end
+    line(tt, S().TIDE_RULE_1, K().C.muted, true)
+    line(tt, U.Fill(S().TIDE_RULE_2, { c = math.floor(Td.Chance() * 100 + 0.5) }), K().C.muted)
+    line(tt, U.Fill(S().TIDE_SPENT, { t = w(Td.Total()), g = U.Short(Td.GoldMult()) }), K().C.muted)
   end
   T.TideBest = function(tt)
+    local Td = Core().Tide
     title(tt, S().TIDE_BEST_TITLE)
-    line(tt, U.Fill(S().TIDE_BEST_TIP, { s = w(Mrgl.db.prestige.best) }), K().C.tipText, true)
+    line(tt, U.Fill(S().TIDE_BEST_TIP, { s = w(Td.Best()) }), K().C.tipText, true)
+    line(tt, U.Fill(S().TIDE_NEXT_PT_TIP, { m = w(Td.NextPoint()) }), K().C.muted)
   end
   T.TideComing = function(tt, j)
     title(tt, U.At(Mrgl.Data.Tide.coming, j).name)
@@ -777,11 +678,6 @@ do
   end
   T.TideUlt = function(tt)
     title(tt, S().TIDE_ULT)
-    if T.TideAllFull() then
-      line(tt, S().TIDE_ALL_MAX, K().C.good)
-    else
-      line(tt, S().TIDE_ALL_MAX, K().C.muted)
-    end
     line(tt, S().TIDE_COMING_TIP, K().C.muted)
   end
   T.TideCompanion = function(idx)
@@ -822,10 +718,6 @@ do
   T.TidePick = function(tt, i)
     local p = U.At(Mrgl.Data.Tide.paths, i)
     title(tt, p.name)
-    if T.TidePathFull(p.id) then
-      line(tt, S().TIDE_MAX, K().C.muted)
-      return
-    end
     line(tt, p.tag, K().C.muted)
     T.TideSpellsNeed(tt, p)
     line(tt, p.per, K().C.tipText, true)

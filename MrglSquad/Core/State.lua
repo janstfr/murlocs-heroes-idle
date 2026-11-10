@@ -1,7 +1,7 @@
 local ADDON, Mrgl = ...
 Mrgl.Core = Mrgl.Core or {}
 do
-  local fix, deep, finite, fixChar
+  local fix, deep, finite, fixChar, convert
   local St = {}
   Mrgl.Core.State = St
   local U = Mrgl.U
@@ -42,8 +42,9 @@ do
                      abilitiesShown = false },
       stats = { clicks = 0, kills = 0, bosses = 0, crits = 0, rareSeen = "" },
       rng = 12345,
-      prestige = { count = 0, best = 1, last = "m", paths = { m = 0, s = 0, a = 0 }, ultimate = 0,
-                  trophies = { nef = false, nefw = "000000000000000000000000000000" } },
+      prestige = { count = 0, best = 1, last = "m", paths = { m = 0, s = 0, a = 0 },
+                  pts = 0, mark = 0, run = 0, dry = 0, prev = 1, recShown = false, ultimate = 0,
+                  trophies = { nef = false } },
       guests = {}
     }
     local list = Mrgl.Data.Murlocs
@@ -250,37 +251,83 @@ do
       db.enemyHp = maxHp
     end
     local pr = db.prestige
-    pr.paths.m = math.floor(pr.paths.m); pr.paths.s = math.floor(pr.paths.s); pr.paths.a = math.floor(pr.paths.a)
-    pr.paths.m = math.min(pr.paths.m, 10000); pr.paths.s = math.min(pr.paths.s, 10000); pr.paths.a = math.min(pr.paths.a, 10000)
-    pr.count = pr.paths.m + pr.paths.s + pr.paths.a
+    pr.paths.m = math.min(math.floor(pr.paths.m), 10000)
+    pr.paths.s = math.min(math.floor(pr.paths.s), 10000)
+    pr.paths.a = math.min(math.floor(pr.paths.a), 10000)
+    pr.pts = math.min(math.floor(pr.pts), 10000)
+    pr.dry = math.min(math.floor(pr.dry), 100)
+    pr.mark = math.floor(pr.mark); pr.run = math.floor(pr.run); pr.prev = math.floor(pr.prev)
+    pr.count = math.max(math.floor(pr.count), pr.paths.m + pr.paths.s + pr.paths.a)
     if pr.last ~= "m" and pr.last ~= "s" and pr.last ~= "a" then
       pr.last = "m"
     end
     pr.best = math.max(math.floor(pr.best), db.maxStage)
+    if not (U.IsTable(raw.prestige) and raw.prestige.mark ~= nil) then
+      convert(db)
+    end
     db.stats.rareSeen = St.NormRares(db.stats.rareSeen)
     local tr = pr.trophies
-    local hadW = U.IsTable(raw.prestige) and U.IsTable(raw.prestige.trophies) and type(raw.prestige.trophies.nefw) == "string"
-    tr.nefw = St.NormNefw(tr.nefw)
-    if not hadW and tr.nef == true then
-      tr.nefw = "1" .. string.sub(tr.nefw, 2)
+    local w = nil
+    if U.IsTable(raw.prestige) and U.IsTable(raw.prestige.trophies) then
+      w = raw.prestige.trophies.nefw
+    end
+    if type(w) == "string" and string.find(w, "1", 1, true) ~= nil then
+      tr.nef = true
     end
     pr.ultimate = math.floor(pr.ultimate)
     return db
   end
-  St.NormNefw = function(s)
-    local out = ""
-    for i = 1, 30 do
-      local ch = ""
-      if type(s) == "string" then
-        ch = string.sub(s, i, i)
-      end
-      if ch == "1" then
-        out = out .. "1"
-      else
-        out = out .. "0"
-      end
+  local ORDER = { "m", "s", "a" }
+  function convert(db)
+    local b = Mrgl.Data.Balance
+    local pr = db.prestige
+    local ps = pr.paths
+    local n = 0
+    pr.mark = 0
+    if pr.best >= b.TIDE_STAGE then
+      local k = math.floor((pr.best - b.TIDE_STAGE) / b.TIDE_STEP)
+      pr.mark = b.TIDE_STAGE + b.TIDE_STEP * k
+      n = 1 + k
     end
-    return out
+    local t = ps.m + ps.s + ps.a
+    local keep = math.min(t, n)
+    if keep < t then
+      local q = { m = 0, s = 0, a = 0 }
+      local r = { m = 0, s = 0, a = 0 }
+      local left = keep
+      for i = 1, 3 do
+        local p = U.At(ORDER, i)
+        local num = keep * ps[p]
+        q[p] = math.floor(num / t)
+        r[p] = num - q[p] * t
+        left = left - q[p]
+      end
+      while left > 0 do
+        local bp = ""
+        for j = 1, 3 do
+          local pj = U.At(ORDER, j)
+          if r[pj] >= 0 and (bp == "" or r[pj] > r[bp]) then
+            bp = pj
+          end
+        end
+        q[bp] = q[bp] + 1
+        r[bp] = -1
+        left = left - 1
+      end
+      ps.m = q.m; ps.s = q.s; ps.a = q.a
+    end
+    pr.pts = n - keep
+    local reached = db.maxStage
+    if not db.boss.active and db.kills >= b.KILLS_PER_STAGE and Mrgl.Core.Formula.IsBoss(db.stage + 1) then
+      reached = math.max(reached, db.stage + 1)
+    end
+    pr.run = 0
+    if reached >= b.TIDE_STAGE then
+      pr.run = math.min(pr.mark, b.TIDE_STAGE + b.TIDE_STEP * math.floor((reached - b.TIDE_STAGE) / b.TIDE_STEP))
+    end
+    pr.prev = pr.best
+    pr.dry = 0
+    pr.recShown = true
   end
   function deep(t)
     if not U.IsTable(t) then

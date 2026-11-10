@@ -36,7 +36,10 @@ do
   A.Power = function(key)
     local T = Mrgl.Core.Tide
     local v = B()[key]
-    if key == "MRGL_DPS_SEC" and T.Has("a", 50) then
+    if key == "WHELPS_CPS" then
+      return v
+    end
+    if key == "MRGL_DPS_SEC" and T.HasMs("a", 3) then
       v = B().TIDE_ANYFIN_SEC
     end
     return v * T.SpellMult()
@@ -46,7 +49,7 @@ do
   end
   A.Look = function(id)
     local d = A.Def(id)
-    if d ~= nil and d.alt ~= nil and Mrgl.Core.Tide.Has("a", 50) then
+    if d ~= nil and d.alt ~= nil and Mrgl.Core.Tide.HasMs("a", 3) then
       return d.alt
     end
     return d
