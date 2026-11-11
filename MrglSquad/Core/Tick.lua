@@ -89,8 +89,9 @@ do
     for a = 1, U.Len(al) do
       local ad = U.At(al, a)
       local ast = db.abilities[ad.id]
-      if ast.readyAt > now + ad.cd then
-        ast.readyAt = now + ad.cd
+      local acd = Mrgl.Core.Abilities.Cooldown(ad.id)
+      if ast.readyAt > now + acd then
+        ast.readyAt = now + acd
       end
     end
     if db.boss.active then

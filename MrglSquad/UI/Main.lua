@@ -218,6 +218,7 @@ do
     if on then
       J().TideAbort()
       Mrgl.UI.Popup.TideCancel()
+      J().PointsLand()
     end
     local f = w.frame
     if on then
@@ -399,6 +400,15 @@ do
     w.tideMarkIcon:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -7)
     w.tideMarkIn = K().FadeIn(w.tideMarkIcon, 0.4)
     K().Border(w.tideMark, C().gold, "OVERLAY", 1)
+    w.tideNum = CreateFrame("Frame", "MrglSquadTideNum", w.tideMark)
+    w.tideNum:SetSize(24, 12)
+    w.tideNumText = K().Text(w.tideNum, K().ARIALN, 11, C().gold, "OUTLINE")
+    w.tideNumText:SetPoint("LEFT", w.tideNum, "LEFT", 0, 0)
+    w.tideNumText:SetJustifyH("LEFT")
+    M.NumBox(w.tideNum, w.tideNumText)
+    w.tideNumIn = K().FadeIn(w.tideNum, 0.4)
+    st.markKey = ""
+    M.PlaceMark()
     M.Drag(w.tideMark)
     K().Tip(w.tideMark, function(tt)
       Tips().TideMark(tt)
@@ -440,7 +450,7 @@ do
     w.minIcon:SetTexture(K().Media(I.minimize))
     w.minIcon:SetAllPoints(w.min)
     K().SetVertex(w.minIcon, C().muted)
-    w.min:SetAlpha(0)
+    w.min:SetAlpha(1)
     w.min:SetScript("OnEnter", function()
       minTint(true)
     end)
@@ -848,6 +858,87 @@ do
     M.Drag(p)
     p:Hide()
     return p
+  end
+  local function numApply(fr)
+    fr.fs:SetText(fr.want)
+    if fr.onText ~= nil then
+      fr.onText(fr)
+    end
+  end
+  M.NumBox = function(fr, fs, onText)
+    fr.fs = fs
+    fr.want = ""
+    fr.onText = onText
+    fr.numOut = fr:CreateAnimationGroup()
+    K().AddAlpha(fr.numOut, 1, 0, 0.1, 0, 1)
+    fr.numOut:SetToFinalAlpha(true)
+    fr.numIn = fr:CreateAnimationGroup()
+    K().AddAlpha(fr.numIn, 0, 1, 0.2, 0, 1)
+    fr.numIn:SetToFinalAlpha(true)
+    fr.numOut:SetScript("OnFinished", function()
+      numApply(fr)
+      fr:SetAlpha(1)
+      K().Replay(fr.numIn)
+    end)
+  end
+  M.NumSet = function(fr, text, animate)
+    if text == fr.want then
+      return
+    end
+    local had = fr.want ~= ""
+    fr.want = text
+    if animate == true and had then
+      K().Replay(fr.numOut)
+      return
+    end
+    if fr.numOut:IsPlaying() then
+      fr.numOut:Stop()
+    end
+    if fr.numIn:IsPlaying() then
+      fr.numIn:Stop()
+    end
+    numApply(fr)
+    fr:SetAlpha(1)
+  end
+  M.NumAnimate = function()
+    return w.frame:IsVisible() and st.numSnap ~= true and Core().rt.quiet ~= true
+  end
+  M.WaitingShown = function()
+    return math.max(0, Core().Tide.Waiting() - J().HeldPoints())
+  end
+  M.MarkX = function()
+    return st.markX
+  end
+  M.PlaceMark = function()
+    local on = w.tideMark:IsShown()
+    local boss = Mrgl.db ~= nil and Mrgl.db.boss.active == true
+    local x = 10 + math.ceil(w.stage:GetStringWidth()) + 4
+    local p0, step, size = 40, 8, 6
+    if on then
+      p0 = math.max(40, x + 12 + 3 + math.ceil(w.tideNumText:GetStringWidth()) + 5)
+      step = 6
+      size = 5
+    end
+    st.markX = x
+    w.tideMark:ClearAllPoints()
+    w.tideMark:SetPoint("TOPLEFT", w.frame, "TOPLEFT", x - 2, -5)
+    w.tideMarkIcon:ClearAllPoints()
+    w.tideMarkIcon:SetPoint("TOPLEFT", w.frame, "TOPLEFT", x, -7)
+    w.tideNum:ClearAllPoints()
+    w.tideNum:SetPoint("LEFT", w.tideMarkIcon, "RIGHT", 3, 0)
+    for i = 1, U.Len(w.pips) do
+      local p = U.At(w.pips, i)
+      p:SetSize(size, size)
+      p:ClearAllPoints()
+      p:SetPoint("TOPLEFT", w.frame, "TOPLEFT", p0 + (i - 1) * step, -10 - (6 - size))
+    end
+    w.bossMark:ClearAllPoints()
+    w.bossMark:SetPoint("TOPLEFT", w.frame, "TOPLEFT", p0, -7)
+    st.markBase = 1
+    if boss then
+      st.markBase = 0.5
+    end
+    w.tideMark:SetAlpha(st.markBase)
   end
   M.TideHold = function(idx)
     if idx == 0 then
@@ -1290,16 +1381,37 @@ do
       w.stage:SetText(stageStr)
     end
     local gate = Cb.GateOpen()
-    local mark = Core().Tide.Avail() and Core().Tide.Waiting() >= 1 and not db.boss.active
+    local shownPts = M.WaitingShown()
+    local mark = Core().Tide.Avail() and shownPts >= 1
+    local anim = M.NumAnimate()
     if mark ~= w.tideMark:IsShown() then
       w.tideMark:SetShown(mark)
       if mark then
-        K().Replay(w.tideMarkIn)
+        M.NumSet(w.tideNum, "+" .. U.Str(shownPts), false)
+        if anim then
+          K().Replay(w.tideMarkIn)
+          K().Replay(w.tideNumIn)
+        else
+          if w.tideMarkIn:IsPlaying() then
+            w.tideMarkIn:Stop()
+          end
+          if w.tideNumIn:IsPlaying() then
+            w.tideNumIn:Stop()
+          end
+        end
       end
+    end
+    if mark then
+      M.NumSet(w.tideNum, "+" .. U.Str(shownPts), anim)
+    end
+    local markKey = (mark and "m" or "-") .. (db.boss.active and "b" or "-") .. math.ceil(w.stage:GetStringWidth()) .. "|" .. math.ceil(w.tideNumText:GetStringWidth())
+    if markKey ~= st.markKey then
+      st.markKey = markKey
+      M.PlaceMark()
     end
     for i = 1, 10 do
       local p = U.At(w.pips, i)
-      p:SetShown(not db.boss.active and not mark)
+      p:SetShown(not db.boss.active)
       if gate then
         K().SetColor(p, C().good)
       elseif i <= db.kills then
@@ -1393,6 +1505,7 @@ do
       Mrgl.UI.Panel.Refresh()
     end
     K().RefreshTip()
+    st.numSnap = false
   end
   M.Strength = function()
     return Core().Boss.Strength()
@@ -1526,7 +1639,8 @@ do
     b.key:SetShown(key ~= "")
     setTimeFont(b, "cd")
     local buff = A.BuffLeft(d.id)
-    local rest = math.min(A.Remaining(d.id), d.cd)
+    local acd = A.Cooldown(d.id)
+    local rest = math.min(A.Remaining(d.id), acd)
     local state = "ready"
     if buff > 0 then
       state = "buff"
@@ -1539,7 +1653,7 @@ do
         b.cd:SetCooldown(GetTime() - (d.dur - buff), d.dur)
       elseif state == "cd" then
         b.cd:SetReverse(false)
-        b.cd:SetCooldown(GetTime() - (d.cd - rest), d.cd)
+        b.cd:SetCooldown(GetTime() - (acd - rest), acd)
       else
         b.cd:Clear()
       end
@@ -1662,6 +1776,10 @@ do
       showHead(t.slot)
       w.buyIcon:Hide()
       w.buyTier:SetText(U.Roman(t.tier))
+    elseif t.kind == "spell" then
+      showHead(0)
+      K().SetIcon(w.buyIcon, Core().Abilities.Look(t.id).icon)
+      w.buyIcon:Show()
     else
       showHead(0)
       K().SetIcon(w.buyIcon, U.At(Mrgl.Data.Self, t.slot).icon)
@@ -1681,7 +1799,7 @@ do
     local tierText = w.buyTier:GetText()
     local timesText = w.buyTimes:GetText()
     local plain = (tierText == nil or tierText == "") and (timesText == nil or timesText == "")
-    if t.kind ~= "self" then
+    if t.kind == "hire" or t.kind == "upgrade" then
       local hd = U.At(w.buyHeads, t.slot)
       if hd.badge ~= nil then
         hd.badge:SetShown(plain)
@@ -1910,17 +2028,6 @@ do
     end
     updateSaveFill(dt)
     M.UpdatePress(dt)
-    local over = w.frame:IsMouseOver()
-    if over then
-      st.hoverA = math.min(1, st.hoverA + dt / 0.15)
-    else
-      st.hoverA = math.max(0, st.hoverA - dt / 0.4)
-    end
-    if st.min then
-      w.min:SetAlpha(1)
-    else
-      w.min:SetAlpha(st.hoverA)
-    end
     if drag.on and M.DragDebug ~= nil then
       drag.dbgT = drag.dbgT + dt
       if drag.dbgT >= 0.25 then

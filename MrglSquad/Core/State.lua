@@ -41,6 +41,7 @@ do
       onboarding = { firstClick = false, firstHire = false, buyShown = false, expandShown = false, bossShown = false,
                      abilitiesShown = false },
       stats = { clicks = 0, kills = 0, bosses = 0, crits = 0, rareSeen = "" },
+      spells = { mrgl = 0, whelps = 0, candle = 0, leeroy = 0 },
       rng = 12345,
       prestige = { count = 0, best = 1, last = "m", paths = { m = 0, s = 0, a = 0 },
                   pts = 0, mark = 0, run = 0, dry = 0, prev = 1, recShown = false, ultimate = 0,
@@ -207,7 +208,7 @@ do
     db.settings.scale = U.Clamp(db.settings.scale, b.SCALE_MIN, b.SCALE_MAX)
     db.settings.tab = math.floor(db.settings.tab)
     db.settings.mode = math.floor(db.settings.mode)
-    if db.settings.tab < 1 or db.settings.tab > 4 then
+    if db.settings.tab < 1 or db.settings.tab > 5 then
       db.settings.tab = 1
     end
     if db.settings.mode < 1 or db.settings.mode > 3 then
@@ -227,7 +228,12 @@ do
     for i = 1, U.Len(ml) do
       local m = db.murlocs[U.At(ml, i).id]
       m.n = math.floor(m.n)
-      m.u = U.Clamp(math.floor(m.u), 0, 3)
+      m.u = U.Clamp(math.floor(m.u), 0, Mrgl.Core.Formula.UpgradeMax(i))
+    end
+    local al = Mrgl.Data.Abilities
+    for ai = 1, U.Len(al) do
+      local aid = U.At(al, ai).id
+      db.spells[aid] = math.min(math.floor(db.spells[aid]), b.SPELL_RANK_MAX)
     end
     local sl = Mrgl.Data.Self
     for j = 1, U.Len(sl) do

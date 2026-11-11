@@ -33,7 +33,7 @@ do
     end
     return 0
   end
-  A.Power = function(key)
+  A.Power = function(key, M, Sp)
     local T = Mrgl.Core.Tide
     local v = B()[key]
     if key == "WHELPS_CPS" then
@@ -42,10 +42,21 @@ do
     if key == "MRGL_DPS_SEC" and T.HasMs("a", 3) then
       v = B().TIDE_ANYFIN_SEC
     end
-    return v * T.SpellMult()
+    local id = "leeroy"
+    if key == "MRGL_DPS_SEC" then
+      id = "mrgl"
+    end
+    return v * T.SpellMult() * F().SpellBoost(M or Mrgl.db.murlocs, id, Sp)
   end
-  A.BuffDur = function(id)
-    return A.Def(id).dur * Mrgl.Core.Tide.BuffMult()
+  A.BuffDur = function(id, M, Sp)
+    local v = A.Def(id).dur * Mrgl.Core.Tide.BuffMult()
+    if id == "candle" then
+      v = v * F().SpellBoost(M or Mrgl.db.murlocs, id, Sp)
+    end
+    return v
+  end
+  A.Cooldown = function(id, M, Sp)
+    return F().SpellCd(M or Mrgl.db.murlocs, id, Sp)
   end
   A.Look = function(id)
     local d = A.Def(id)
@@ -102,7 +113,7 @@ do
     end
     local d = A.Def(id)
     local st = db.abilities[id]
-    st.readyAt = C.Now() + d.cd
+    st.readyAt = C.Now() + A.Cooldown(id)
     st.used = true
     local up = { id = id, slot = A.Slot(id), opener = fromOpener == true }
     if auto == true then

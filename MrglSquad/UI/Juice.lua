@@ -313,7 +313,7 @@ do
   end
   local HL = { leeroy = { size = 16, flags = "OUTLINE", c = "leeroy", dur = 1.0 }, victory = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, bonus = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 }, zone = { size = 18, flags = "OUTLINE", c = "gold", dur = 2.0 }, retreat = { size = 14, flags = "OUTLINE", c = "text", dur = 1.2 }, rare = { size = 14, flags = "OUTLINE", c = "rare", dur = 1.2 }, tide = { size = 16, flags = "", c = "gold", dur = 2.0, out = 0.4 } }
   local HL_W = 220; local HL_OUT = 0.25; local REWARD_ROLL = 0.6
-  local hic = { size = 20, gap = 6 }
+  local hic = { size = 20, gap = 6, x = 0 }
   J.hic = hic
   local hq = {  }; local hcur
   local hf; local hfs; local hIn; local hOut; local hreward
@@ -552,7 +552,7 @@ do
     return string.sub(t, 1, i - 1)
   end
   J.FitText = fitText
-  J.Headline = function(kind, text, gold, alt, short)
+  J.Headline = function(kind, text, gold, alt, short, extra)
     if not visible() then
       return nil
     end
@@ -575,6 +575,10 @@ do
     end
     if short ~= nil then
       rec.short = short
+    end
+    if extra ~= nil then
+      rec.icon = extra.icon
+      rec.point = extra.point == true
     end
     local cut = false
     if hcur ~= nil then
@@ -726,6 +730,9 @@ do
     end
     rec.t = rec.t + dt
     rec.life = rec.life + dt
+    if rec.point == true and rec.phase == "hold" then
+      J.PointStep(rec)
+    end
     if rec.phase == "hold" and rec.roll <= REWARD_ROLL then
       rec.roll = rec.roll + dt
       setReward(rec)
@@ -849,6 +856,7 @@ do
       end
       fitText(hfs, st.size, st.flags, rec.text, HL_W - hic.size - hic.gap)
       local ix = math.floor((HL_W - hic.size - hic.gap - hfs:GetStringWidth()) / 2)
+      hic.x = ix
       K().SetIcon(hic.tex, rec.icon)
       hic.tex:ClearAllPoints()
       hic.tex:SetPoint("LEFT", hf, "LEFT", ix, 0)
@@ -964,7 +972,7 @@ do
       U.At(w.pips, i):SetAlpha(a)
     end
     w.bossMark:SetAlpha(a)
-    w.tideMark:SetAlpha(a)
+    w.tideMark:SetAlpha(a * M().st.markBase)
   end
   bn.showPlus = function(gold)
     if bn.plusT >= 0 then
@@ -1169,6 +1177,8 @@ do
   end
   local TD = { IN = 0.3, HOLD = 0.7, OUT = 0.6, A = 0.35, A_CALM = 0.25 }
   local td = { t = -1, path = "m", risen = false, debug = false, rising = false, autoMrgl = false }
+  td.PT = { START = 0.5, FLY = 0.6, FADE = 0.15, LAND = 1.0, SCALE = 0.6 }
+  J.PT = td.PT
   J.TD = TD
   td.build = function(f)
     td.veil = CreateFrame("Frame", "MrglSquadTideVeil", f)
@@ -1187,6 +1197,72 @@ do
       J.TideAbort()
     end)
     td.veil:EnableMouse(true)
+    td.fx = CreateFrame("Frame", "MrglSquadTidePointFx", W().headLayer)
+    M().SetLevel(td.fx, M().LEVEL.headline + 1)
+    td.fx:SetAllPoints(f)
+    td.mark = K().Icon(td.fx, Mrgl.Data.Tide.icon, "OVERLAY")
+    td.mark:SetSize(hic.size, hic.size)
+    td.mark:SetPoint("CENTER", hic.tex, "CENTER", 0, 0)
+    td.mark:SetAlpha(0)
+    td.markAnim = td.mark:CreateAnimationGroup()
+    td.markMove = K().AddMove(td.markAnim, 0, 0, td.PT.FLY, 0, 1, "OUT")
+    K().AddScale(td.markAnim, 1, td.PT.SCALE, td.PT.FLY, 0, 1, "OUT")
+    K().AddAlpha(td.markAnim, 1, 1, td.PT.FLY - td.PT.FADE, 0, 1)
+    K().AddAlpha(td.markAnim, 1, 0, td.PT.FADE, td.PT.FLY - td.PT.FADE, 1)
+    td.markAnim:SetToFinalAlpha(true)
+  end
+  td.pointStep = function(rec)
+    if rec.flown ~= true and rec.t >= td.PT.START then
+      rec.flown = true
+      td.fly()
+    end
+    if rec.landed ~= true and rec.t >= td.PT.LAND then
+      rec.landed = true
+      M().Refresh()
+    end
+  end
+  J.PointStep = td.pointStep
+  td.fly = function()
+    if calm() then
+      return
+    end
+    local fromX = (M().GEO.w - HL_W) / 2 + hic.x + hic.size / 2
+    local fromY = -28 - hic.size / 2
+    local toX, toY = M().MarkX() + 6, -13
+    td.markMove:SetOffset(toX - fromX, toY - fromY)
+    if td.markAnim:IsPlaying() then
+      td.markAnim:Stop()
+    end
+    td.mark:SetAlpha(1)
+    td.markAnim:Play()
+  end
+  J.HeldPoints = function()
+    if bn.min() or not visible() then
+      return 0
+    end
+    local n = 0
+    if hcur ~= nil and hcur.point == true and hcur.landed ~= true then
+      n = n + 1
+    end
+    for i = 1, U.Len(hq) do
+      local q = U.At(hq, i)
+      if q.point == true and q.landed ~= true then
+        n = n + 1
+      end
+    end
+    return n
+  end
+  J.PointsLand = function()
+    if hcur ~= nil and hcur.point == true then
+      hcur.landed = true
+    end
+    for i = 1, U.Len(hq) do
+      U.At(hq, i).landed = true
+    end
+    if td.markAnim ~= nil and td.markAnim:IsPlaying() then
+      td.markAnim:Stop()
+      td.mark:SetAlpha(0)
+    end
   end
   td.alpha = function()
     local A = TD.A
@@ -1395,7 +1471,10 @@ do
     if p.lucky == true then
       key = "TIDE_LUCKY_HEAD"
     end
-    td.calmLine(U.Fill(S()[key], { s = p.stage }))
+    if Core().rt.quiet == true or not bn.canPlay() or bn.min() then
+      return
+    end
+    J.Headline("tide", U.Fill(S()[key], { s = p.stage }), nil, nil, nil, { icon = Mrgl.Data.Tide.icon, point = true })
   end
   J.DebugTide = function()
     if not visible() or bn.min() then
@@ -2131,6 +2210,16 @@ do
       J.StrengthCheck()
       M().Refresh()
     end)
+    On("SPELL_UP", function()
+      if not visible() then
+        return
+      end
+      if Core().rt.chain then
+        return
+      end
+      J.StrengthCheck()
+      M().Refresh()
+    end)
     On("BUY_CHAIN", function(p)
       if not visible() then
         chainReset()
@@ -2438,6 +2527,11 @@ do
     J.sil:Hide()
     J.msAnim:Stop()
     clearHeadline()
+    if td.markAnim:IsPlaying() then
+      td.markAnim:Stop()
+    end
+    td.mark:SetAlpha(0)
+    M().st.numSnap = true
     J.die:Stop()
     J.spawn:Stop()
     J.punch:Stop()

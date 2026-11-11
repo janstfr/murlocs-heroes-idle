@@ -3,6 +3,7 @@ Mrgl.UI = Mrgl.UI or {}
 do
   local K, S, Core, F, title, line, double, w, g, exactUp, gainTok, costTok, upgEffect
   local toggleLine, nextLine
+  local rankBuy, waitLine
   local T = {}
   Mrgl.UI.Tips = T
   local U = Mrgl.U
@@ -313,13 +314,19 @@ do
     end
     return U.Fill(S().UPG_DOUBLE, { murloc = m.name })
   end
+  local function upgDouble(tt, up, c)
+    if up.at ~= nil then
+      line(tt, S().UPG_DOUBLE_TOO, c, true)
+    end
+  end
   T.Upgrade = function(tt, i, tier)
     local m = F().Murloc(i)
     local up = U.At(m.upgrades, tier)
     title(tt, up.name, K().C.gold)
     line(tt, U.Fill(S().UPG_OF, { murloc = m.name, tier = tier }), K().C.muted)
     line(tt, upgEffect(m, up), K().C.good, true)
-    line(tt, U.Fill(S().COST, { cost = costTok(up.cost) }))
+    upgDouble(tt, up, K().C.good)
+    line(tt, U.Fill(S().COST, { cost = costTok(F().UpgradeCost(i, tier)) }))
     line(tt, S().UPG_CLICK, K().C.muted)
   end
   T.UpgradeTeaser = function(tt, i, tier)
@@ -329,9 +336,10 @@ do
     title(tt, up.name)
     line(tt, U.Fill(S().UPG_OF, { murloc = m.name, tier = tier }), K().C.muted)
     line(tt, upgEffect(m, up), K().C.tipText, true)
-    line(tt, U.Fill(S().COST, { cost = w(exactUp(up.cost)) }))
-    if e.n < F().UpgradeReq(tier) then
-      line(tt, U.Fill(S().UPG_LOCKED, { req = w(F().UpgradeReq(tier)), murloc = m.name, n = w(e.n) }), K().C.tipText, true)
+    upgDouble(tt, up, K().C.tipText)
+    line(tt, U.Fill(S().COST, { cost = w(exactUp(F().UpgradeCost(i, tier))) }))
+    if e.n < F().UpgradeReq(i, tier) then
+      line(tt, U.Fill(S().UPG_LOCKED, { req = w(F().UpgradeReq(i, tier)), murloc = m.name, n = w(e.n) }), K().C.tipText, true)
     elseif e.u < tier - 1 then
       line(tt, U.Fill(S().UPG_NEEDS_PREV, { upgrade = w(U.At(m.upgrades, tier - 1).name) }), K().C.tipText, true)
     end
@@ -399,8 +407,62 @@ do
     else
       line(tt, U.Fill(S().SELF_GAIN, { gain = gainTok(gain) }), K().C.tipText, true)
     end
-    line(tt, U.Fill(S().COST, { cost = costTok(F().SelfCost(d.id, r)) }))
-    line(tt, S().UPG_CLICK, K().C.muted)
+    rankBuy(tt, "self", d.id)
+  end
+  function rankBuy(tt, kind, id)
+    local k = Mrgl.UI.Panel.RankAmount(kind, id)
+    line(tt, U.Fill(S().COST, { cost = costTok(Core().Shop.RankPrice(kind, id, k)) }))
+    if k > 1 then
+      line(tt, U.Fill(S().RANK_CLICK, { k = k }), K().C.muted)
+    else
+      line(tt, S().UPG_CLICK, K().C.muted)
+    end
+  end
+  T.SpellValueText = function(id, r)
+    local p = math.floor(100 * Mrgl.Data.Balance.SPELL_RANK_STEP * r + 0.5)
+    local cm = F().SpellCdMult(r)
+    if cm < 1 then
+      return U.Fill(S().SPELL_VAL_CD, { p = p, c = math.floor(100 * (1 - cm) + 0.5) })
+    end
+    return U.Fill(S().SPELL_VAL, { p = p })
+  end
+  T.SpellGain = function(id)
+    local db = Mrgl.db
+    local c = Core().Shop.ClickFactor()
+    local base = F().EffDPS(db.murlocs, db.self, c, db.spells)
+    local Sp = U.Copy(db.spells)
+    Sp[id] = Sp[id] + 1
+    local after = F().EffDPS(db.murlocs, db.self, c, Sp)
+    if not (base > 0) then
+      return 100
+    end
+    return 100 * (after / base - 1)
+  end
+  T.Spell = function(tt, j)
+    local d = U.At(Mrgl.Data.Abilities, j)
+    local A = Core().Abilities
+    local look = A.Look(d.id)
+    local r = Mrgl.db.spells[d.id]
+    title(tt, look.name)
+    line(tt, look.text, K().C.tipText, true)
+    if not A.Unlocked(d.id) then
+      line(tt, U.Fill(S().ABILITY_LOCKED, { s = w(d.stage) }))
+      return
+    end
+    line(tt, d.grow, K().C.tipText, true)
+    line(tt, U.Fill(S().SELF_NOW, { value = w(T.SpellValueText(d.id, r)) }))
+    line(tt, U.Fill(S().SELF_NEXT, { next = g(T.SpellValueText(d.id, r + 1)) }))
+    line(tt, U.Fill(S().ABILITY_CD, { cd = w(U.CDLong(A.Cooldown(d.id))) }))
+    line(tt, U.Fill(S().SPELL_GAIN, { gain = gainTok(T.SpellGain(d.id)) }), K().C.tipText, true)
+    line(tt, S().SPELL_RULE, K().C.muted, true)
+    rankBuy(tt, "spell", d.id)
+  end
+  T.SpellsTab = function(tt)
+    title(tt, S().TAB_SPELLS)
+    line(tt, S().TAB_SPELLS_TIP, K().C.tipText, true)
+    if not Core().Shop.SpellsOpen() then
+      line(tt, S().TAB_SPELLS_LOCKED, K().C.muted)
+    end
   end
   T.AbilityAlt = function(i)
     local d = U.At(Mrgl.Data.Abilities, i)
@@ -426,7 +488,7 @@ do
     end
     title(tt, name, K().C.gold)
     line(tt, text, K().C.tipText, true)
-    line(tt, U.Fill(S().ABILITY_CD, { cd = w(U.CDLong(d.cd)) }))
+    line(tt, U.Fill(S().ABILITY_CD, { cd = w(U.CDLong(A.Cooldown(d.id))) }))
     local buff = A.BuffLeft(d.id)
     if buff > 0 then
       line(tt, U.Fill(S().ABILITY_ACTIVE, { t = w(U.Clock(math.ceil(buff))) }), K().C.gold)
@@ -445,6 +507,9 @@ do
     end
     if t.kind == "upgrade" then
       return U.At(F().Murloc(t.slot).upgrades, t.tier).name
+    end
+    if t.kind == "spell" then
+      return Core().Abilities.Look(t.id).name
     end
     return U.At(Mrgl.Data.Self, t.slot).name
   end
@@ -634,8 +699,13 @@ do
   end
   T.TideButton = function(tt)
     title(tt, S().TAB_TIDE)
-    line(tt, S().TIDE_BTN_TIP, K().C.tipText, true)
     local Td = Core().Tide
+    if Td.Waiting() <= 0 and Td.CanEmpty() then
+      line(tt, S().TIDE_NO_PT, K().C.muted)
+      line(tt, T.TideLuck(), K().C.tipText, true)
+    else
+      line(tt, S().TIDE_BTN_TIP, K().C.tipText, true)
+    end
     if Td.Ready() then
       return
     end
@@ -647,24 +717,42 @@ do
     end
   end
   T.TideMark = function(tt)
+    local Td = Core().Tide
     title(tt, S().TIDE_MARK)
-    line(tt, S().TIDE_NO_KILL, K().C.tipText)
+    waitLine(tt, Mrgl.UI.Main.WaitingShown())
+    if Td.Total() <= 0 then
+      line(tt, S().TIDE_NO_KILL, K().C.tipText)
+    end
+    if not Td.Ready() then
+      line(tt, Mrgl.UI.Panel.TideReason().text, K().C.muted)
+    end
     line(tt, S().TIDE_MARK_TIP, K().C.muted)
   end
-  T.TideHead = function(tt)
-    local Td = Core().Tide
-    local n = Td.Waiting()
-    title(tt, S().TAB_TIDE)
+  function waitLine(tt, n)
     if n == 1 then
       line(tt, S().TIDE_PT_WAITING, K().C.white)
     elseif n > 1 then
-      line(tt, U.Fill(S().TIDE_PTS_WAITING, { n = w(n) }), K().C.white)
+      line(tt, U.Fill(S().TIDE_PTS_WAITING, { n = n }), K().C.white)
     else
       line(tt, S().TIDE_NO_PT, K().C.muted)
     end
+  end
+  T.TideLuck = function()
+    local pr = Mrgl.db.prestige
+    local luck = S().TIDE_LUCK_LINE
+    if pr.mark <= Mrgl.Data.Balance.TIDE_STAGE + Mrgl.Data.Balance.TIDE_STEP then
+      luck = S().TIDE_LUCK_ONE
+    end
+    return U.Fill(luck, { c = math.floor(Core().Tide.Chance() * 100 + 0.5), m = pr.mark })
+  end
+  T.TideHead = function(tt)
+    local Td = Core().Tide
+    local n = Mrgl.UI.Main.WaitingShown()
+    title(tt, U.Fill(S().TIDE_PTS_TITLE, { n = Td.Total() + n }))
+    waitLine(tt, n)
+    line(tt, U.Fill(S().TIDE_SPENT, { t = w(Td.Total()), g = U.Short(Td.GoldMult()) }), K().C.muted)
     line(tt, S().TIDE_RULE_1, K().C.muted, true)
     line(tt, U.Fill(S().TIDE_RULE_2, { c = math.floor(Td.Chance() * 100 + 0.5) }), K().C.muted)
-    line(tt, U.Fill(S().TIDE_SPENT, { t = w(Td.Total()), g = U.Short(Td.GoldMult()) }), K().C.muted)
   end
   T.TideBest = function(tt)
     local Td = Core().Tide
