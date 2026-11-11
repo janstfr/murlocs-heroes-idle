@@ -1,7 +1,7 @@
 local ADDON, Mrgl = ...
 Mrgl.Core = Mrgl.Core or {}
 do
-  local B, Ti, Pw
+  local B, Ti, Pw, rankOf
   local F = {}
   Mrgl.Core.Formula = F
   local U = Mrgl.U
@@ -11,8 +11,8 @@ do
   function Ti()
     return Mrgl.Core.Tide
   end
-  function Pw(key)
-    return Mrgl.Core.Abilities.Power(key)
+  function Pw(key, M, Sp)
+    return Mrgl.Core.Abilities.Power(key, M, Sp)
   end
   F.IsBoss = function(s)
     return s % B().BOSS_EVERY == 0
@@ -68,8 +68,16 @@ do
     return math.ceil(s / B().BOSS_EVERY) * B().BOSS_EVERY
   end
   F.GoldMult = function(M)
-    if M.raider.u >= 3 then
-      return (1 + B().RAIDER_GOLD) * Ti().GoldMult()
+    local u = M.raider.u
+    if u >= 3 then
+      local p = B().RAIDER_GOLD
+      if u >= 4 then
+        p = p + B().RAIDER_GOLD_4
+      end
+      if u >= 5 then
+        p = p + B().RAIDER_GOLD_5
+      end
+      return (1 + p) * Ti().GoldMult()
     end
     return Ti().GoldMult()
   end
@@ -79,16 +87,32 @@ do
     if boss then
       g = g * b.BOSS_GOLD_MULT
     end
+    if boss and M.raider.u >= 6 then
+      g = g * b.RAIDER_BOSS_GOLD_6
+    end
     if rare then
       g = g * b.RARE_GOLD
     end
     return g * F.GoldMult(M)
   end
   F.BossTimer = function(M)
+    if M.tidehunter.u >= 4 then
+      return B().BOSS_TIMER + B().TIDE_TIMER + B().TIDE_TIMER_4 + Ti().TimerPlus()
+    end
     if M.tidehunter.u >= 3 then
       return B().BOSS_TIMER + B().TIDE_TIMER + Ti().TimerPlus()
     end
     return B().BOSS_TIMER + Ti().TimerPlus()
+  end
+  F.BossDmg = function(M)
+    local u = M.tidehunter.u
+    if u >= 6 then
+      return 1 + B().TIDEHUNTER_BOSS_5 + B().TIDEHUNTER_BOSS_6
+    end
+    if u >= 5 then
+      return 1 + B().TIDEHUNTER_BOSS_5
+    end
+    return 1
   end
   F.Milestones = function(n)
     local b = B()
@@ -170,7 +194,39 @@ do
     if n > 0 then
       return F.MurlocDPS(M, i) / n
     end
-    return m.dps * B().UPG_DPS_MULT ^ math.min(M[m.id].u, 2) * Ti().MurlocMult()
+    return m.dps * B().UPG_DPS_MULT ^ math.min(M[m.id].u, 2) * F.LateMult(M[m.id].u) * Ti().MurlocMult()
+  end
+  F.LateMult = function(u)
+    if u <= 3 then
+      return 1
+    end
+    return B().UPG_DPS_MULT ^ (u - 3)
+  end
+  local function warAura(u)
+    local b = B()
+    if u >= 6 then
+      return b.WARLEADER_AURA_6
+    end
+    if u >= 5 then
+      return b.WARLEADER_AURA_5
+    end
+    if u >= 4 then
+      return b.WARLEADER_AURA_4
+    end
+    return b.WARLEADER_AURA
+  end
+  local function murkPer(u)
+    local b = B()
+    if u >= 6 then
+      return b.MURKEYE_PER_6
+    end
+    if u >= 5 then
+      return b.MURKEYE_PER_5
+    end
+    if u >= 4 then
+      return b.MURKEYE_PER_4
+    end
+    return b.MURKEYE_PER
   end
   F.MurlocDPS = function(M, i)
     local b = B()
@@ -180,16 +236,19 @@ do
       return 0
     end
     local d = m.dps * e.n * 2 ^ F.Milestones(e.n) * b.UPG_DPS_MULT ^ math.min(e.u, 2)
+    if e.u > 3 then
+      d = d * F.LateMult(e.u)
+    end
     local aura = 1
     if m.id ~= "oracle" and M.oracle.u >= 3 then
       aura = aura + b.ORACLE_AURA
     end
     if m.id ~= "warleader" and M.warleader.u >= 3 then
-      aura = aura + b.WARLEADER_AURA
+      aura = aura + warAura(M.warleader.u)
     end
     d = d * aura
     if m.id == "murkeye" and e.u >= 3 then
-      d = d * (1 + b.MURKEYE_PER * F.HiredTotal(M))
+      d = d * (1 + murkPer(e.u) * F.HiredTotal(M))
     end
     return d * Ti().MurlocMult()
   end
@@ -232,8 +291,15 @@ do
   F.UpgradeCost = function(i, tier)
     return U.At(F.Murloc(i).upgrades, tier).cost * Ti().CostMult()
   end
-  F.UpgradeReq = function(tier)
+  F.UpgradeReq = function(i, tier)
+    local up = U.At(F.Murloc(i).upgrades, tier)
+    if up ~= nil and up.at ~= nil then
+      return up.at
+    end
     return U.At(B().UPG_AT, tier)
+  end
+  F.UpgradeMax = function(i)
+    return U.Len(F.Murloc(i).upgrades)
   end
   F.ClickBase = function(S)
     return (1 + S.click) * 2 ^ math.floor(S.click / B().CLICK_DOUBLE_EVERY)
@@ -243,13 +309,23 @@ do
     if M.tinyfin.u >= 3 then
       p = p + B().TINYFIN_ECHO
     end
+    if M.tinyfin.u >= 4 then
+      p = p + B().TINYFIN_ECHO_4
+    end
+    if M.tinyfin.u >= 5 then
+      p = p + B().TINYFIN_ECHO_5
+    end
     if Ti().EchoFloor() then
       p = math.max(B().TIDE_ECHO_FLOOR, p)
     end
     return p
   end
   F.ClickDamage = function(M, S, dps)
-    return math.min(B().HP_CAP, (F.ClickBase(S) + F.EchoShare(M, S) * dps) * Ti().ClickMult())
+    local v = (F.ClickBase(S) + F.EchoShare(M, S) * dps) * Ti().ClickMult()
+    if M.tinyfin.u >= 6 then
+      v = v * B().TINYFIN_CLICK_6
+    end
+    return math.min(B().HP_CAP, v)
   end
   F.CritChance = function(S, candle)
     local p = B().CRIT_BASE + B().CRIT_STEP * S.crit
@@ -294,26 +370,100 @@ do
     local mx = F.SelfMax(id)
     return mx > 0 and r >= mx
   end
-  F.EffDPS = function(M, S, c)
+  F.EffDPS = function(M, S, c, Sp)
     local d = F.SquadDPS(M)
     local v = d + c * F.ClickExpected(M, S, d, false)
+    if Ti().Total() >= 1 then
+      v = v + F.AbilDPS(M, S, c, d, Sp)
+    end
     v = v * F.GoldMult(M)
     if M.tidehunter.u >= 3 then
       v = v * 1.05
     end
+    if M.tidehunter.u >= 4 then
+      v = v * 1.05
+    end
+    if M.tidehunter.u >= 5 then
+      v = v * (1 + B().UPG_BOSS_VALUE * (F.BossDmg(M) - 1))
+    end
     return v
   end
-  F.Burst = function(M, S, R)
+  function rankOf(Sp, id)
+    local t = Sp
+    if t == nil and Mrgl.db ~= nil then
+      t = Mrgl.db.spells
+    end
+    if t == nil or t[id] == nil then
+      return 0
+    end
+    return t[id]
+  end
+  F.SpellRank = rankOf
+  F.SpellBoost = function(M, id, Sp)
+    local v = 1 + B().SPELL_RANK_STEP * rankOf(Sp, id)
+    if M.oracle.u >= 5 then
+      v = v * B().ORACLE_SPELL_5
+    end
+    return v
+  end
+  F.SpellCdMult = function(r)
+    local b = B()
+    return 1 - math.min(b.SPELL_CD_MAX, b.SPELL_CD_STEP * math.floor(r / b.SPELL_CD_EVERY))
+  end
+  F.SpellCd = function(M, id, Sp)
+    local cd = Mrgl.Core.Abilities.Def(id).cd
+    local r = rankOf(Sp, id)
+    if r >= B().SPELL_CD_EVERY then
+      cd = cd * F.SpellCdMult(r)
+    end
+    local u = M.oracle.u
+    if u >= 6 then
+      return cd * B().ORACLE_CD_6
+    end
+    if u >= 4 then
+      return cd * B().ORACLE_CD_4
+    end
+    return cd
+  end
+  F.SpellCost = function(id, r)
+    local b = B()
+    return U.At(b.SPELL_COST_BASE, Mrgl.Core.Abilities.Slot(id)) * b.SPELL_COST_GROWTH ^ r
+  end
+  F.WhelpMult = function(M, Sp)
+    return Ti().SpellMult() * F.SpellBoost(M, "whelps", Sp)
+  end
+  F.AbilDPS = function(M, S, c, d, Sp)
+    local A = Mrgl.Core.Abilities
+    local b = B()
+    local click = F.ClickDamage(M, S, d)
+    local cm = F.CritMult(S)
+    local ce = 1 + F.CritChance(S, false) * (cm - 1)
+    local v = 0
+    if A.Unlocked("mrgl") then
+      v = v + (click * ce + Pw("MRGL_DPS_SEC", M, Sp) * d) / F.SpellCd(M, "mrgl", Sp)
+    end
+    if A.Unlocked("whelps") then
+      v = v + Pw("WHELPS_CPS", M, Sp) * A.BuffDur("whelps", M, Sp) * click * F.WhelpMult(M, Sp) * ce / F.SpellCd(M, "whelps", Sp)
+    end
+    if A.Unlocked("candle") then
+      v = v + c * click * b.CANDLE_CRIT * (cm - 1) * math.min(1, A.BuffDur("candle", M, Sp) / F.SpellCd(M, "candle", Sp))
+    end
+    if A.Unlocked("leeroy") then
+      v = v + (Pw("LEEROY_CLICKS", M, Sp) * click * cm + Pw("LEEROY_DPS_SEC", M, Sp) * d) / F.SpellCd(M, "leeroy", Sp)
+    end
+    return math.min(b.HP_CAP, v)
+  end
+  F.Burst = function(M, S, R, Sp)
     local d = F.SquadDPS(M)
     local click = F.ClickDamage(M, S, d)
     local cm = F.CritMult(S)
     local b = B()
     local t = 0
     if R.mrgl == true then
-      t = t + click + Pw("MRGL_DPS_SEC") * d
+      t = t + click + Pw("MRGL_DPS_SEC", M, Sp) * d
     end
     if R.leeroy == true then
-      t = t + Pw("LEEROY_CLICKS") * click * cm + Pw("LEEROY_DPS_SEC") * d
+      t = t + Pw("LEEROY_CLICKS", M, Sp) * click * cm + Pw("LEEROY_DPS_SEC", M, Sp) * d
     end
     if R.whelps == true then
       local p = F.CritChance(S, false)
@@ -323,8 +473,8 @@ do
       if R.leeroy == true then
         p = 1
       end
-      local cl = Pw("WHELPS_CPS") * Mrgl.Core.Abilities.BuffDur("whelps")
-      t = t + cl * click * Ti().SpellMult() * (1 + p * (cm - 1))
+      local cl = Pw("WHELPS_CPS", M, Sp) * Mrgl.Core.Abilities.BuffDur("whelps", M, Sp)
+      t = t + cl * click * F.WhelpMult(M, Sp) * (1 + p * (cm - 1))
     end
     return t
   end
@@ -339,7 +489,7 @@ do
     local b = B()
     local d = F.SquadDPS(M)
     local T = F.BossTimer(M)
-    local hp = F.EnemyHP(bs)
+    local hp = F.EnemyHP(bs) / F.BossDmg(M)
     local dg = d
     local ac = Ti().AutoSwing()
     if ac > 0 then
@@ -359,10 +509,10 @@ do
     end
     return "grey"
   end
-  F.Strength = function(M, S, bs, R)
+  F.Strength = function(M, S, bs, R, Sp)
     local d = F.SquadDPS(M)
-    local need = B().READY_GREEN * F.EnemyHP(bs)
-    return math.min(1, (d * F.BossTimer(M) + F.Burst(M, S, R)) / need)
+    local need = B().READY_GREEN * F.EnemyHP(bs) / F.BossDmg(M)
+    return math.min(1, (d * F.BossTimer(M) + F.Burst(M, S, R, Sp)) / need)
   end
   F.GoldRate = function(M, S, s, cps)
     local d = F.SquadDPS(M)

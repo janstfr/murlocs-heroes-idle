@@ -72,7 +72,7 @@ do
   end
   Sh.UpgradeUnlocked = function(i)
     local e = Mrgl.db.murlocs[F().Murloc(i).id]
-    return e.u < 3 and e.n >= F().UpgradeReq(e.u + 1)
+    return e.u < F().UpgradeMax(i) and e.n >= F().UpgradeReq(i, e.u + 1)
   end
   Sh.BuyUpgrade = function(id)
     local db = Mrgl.db
@@ -98,20 +98,27 @@ do
     end
     return db.maxStage >= B().SELF_CRIT_STAGE
   end
-  Sh.BuySelf = function(id)
+  Sh.BuySelf = function(id, k)
     local db = Mrgl.db
     local r = db.self[id]
-    if not Sh.SelfVisible(id) or F().SelfMaxed(id, r) then
+    local n = 1
+    if k ~= nil then
+      n = k
+    end
+    if not (n >= 1) or not Sh.SelfVisible(id) or F().SelfMaxed(id, r + n - 1) then
       return false
     end
     local cost = F().SelfCost(id, r)
+    if n > 1 then
+      cost = Sh.RankPrice("self", id, n)
+    end
     if db.gold < cost then
       return false
     end
     db.gold = db.gold - cost
-    db.self[id] = r + 1
+    db.self[id] = r + n
     Sh.Dirty()
-    C.Fire("SELF_UP", tag({ id = id, rank = r + 1 }))
+    C.Fire("SELF_UP", tag({ id = id, rank = r + n }))
     return true
   end
   Sh.SelfValue = function(id, r)
@@ -127,6 +134,89 @@ do
     end
     return b.CRITM_BASE + b.CRITM_STEP * r
   end
+  Sh.SpellsOpen = function()
+    return Mrgl.db.prestige.count >= 1 or Mrgl.Core.Tide.Total() >= 1
+  end
+  Sh.SpellVisible = function(id)
+    return Sh.SpellsOpen() and Mrgl.Core.Abilities.Unlocked(id)
+  end
+  Sh.BuySpell = function(id, k)
+    local db = Mrgl.db
+    local n = 1
+    if k ~= nil then
+      n = k
+    end
+    if not (n >= 1) or Mrgl.Core.Abilities.Def(id) == nil or not Sh.SpellVisible(id) then
+      return false
+    end
+    local r = db.spells[id]
+    local cost = F().SpellCost(id, r)
+    if n > 1 then
+      cost = Sh.RankPrice("spell", id, n)
+    end
+    if db.gold < cost then
+      return false
+    end
+    db.gold = db.gold - cost
+    db.spells[id] = r + n
+    Sh.Dirty()
+    C.Fire("SPELL_UP", tag({ id = id, rank = r + n, slot = Mrgl.Core.Abilities.Slot(id) }))
+    return true
+  end
+  local RANK_LIMIT = 10000
+  local function rankNow(kind, id)
+    if kind == "self" then
+      return Mrgl.db.self[id]
+    end
+    return Mrgl.db.spells[id]
+  end
+  local function rankCost(kind, id, r)
+    if kind == "self" then
+      return F().SelfCost(id, r)
+    end
+    return F().SpellCost(id, r)
+  end
+  local function rankRoom(kind, id, r)
+    if kind ~= "self" then
+      return RANK_LIMIT
+    end
+    local mx = F().SelfMax(id)
+    if mx <= 0 then
+      return RANK_LIMIT
+    end
+    return math.max(0, mx - r)
+  end
+  Sh.RankPrice = function(kind, id, k)
+    local r = rankNow(kind, id)
+    local sum = 0
+    for j = 0, k - 1 do
+      sum = sum + rankCost(kind, id, r + j)
+    end
+    return sum
+  end
+  Sh.RankAmount = function(kind, id, mode)
+    local r = rankNow(kind, id)
+    local room = rankRoom(kind, id, r)
+    if room <= 0 then
+      return 1
+    end
+    if mode == Sh.MODE_NEXT then
+      return math.min(room, 10 - r % 10)
+    end
+    if mode ~= Sh.MODE_MAX then
+      return 1
+    end
+    local gold = Mrgl.db.gold
+    local k, sum = 0, 0
+    while k < room do
+      sum = sum + rankCost(kind, id, r + k)
+      if not (sum <= gold) then
+        break
+      end
+      k = k + 1
+    end
+    return math.max(1, k)
+  end
   Sh.ClickFactor = function()
     return math.min(B().BESTBUY_CLICK_CAP, B().BESTBUY_CLICK_SHARE * Mrgl.Core.Combat.ClickRate() + Mrgl.Core.Tide.AutoSwing())
   end
@@ -134,7 +224,11 @@ do
     local db = Mrgl.db
     local M = db.murlocs
     local S = db.self
-    if cand.kind == "hire" then
+    local Sp = db.spells
+    if cand.kind == "spell" then
+      Sp = U.Copy(Sp)
+      Sp[cand.id] = Sp[cand.id] + 1
+    elseif cand.kind == "hire" then
       M = U.Copy(M)
       M[cand.id] = { n = db.murlocs[cand.id].n + cand.amount, u = db.murlocs[cand.id].u }
     elseif cand.kind == "upgrade" then
@@ -144,11 +238,11 @@ do
       S = U.Copy(S)
       S[cand.id] = S[cand.id] + 1
     end
-    return { M = M, S = S }
+    return { M = M, S = S, Sp = Sp }
   end
   function evalCand(cand, c)
     local a = applyCand(cand)
-    return F().EffDPS(a.M, a.S, c)
+    return F().EffDPS(a.M, a.S, c, a.Sp)
   end
   Sh.NextJump = function()
     local db = Mrgl.db
@@ -168,7 +262,7 @@ do
       end
       if ok then
         local a = applyCand(cand)
-        local d = F().Strength(a.M, a.S, bs, R) - base
+        local d = F().Strength(a.M, a.S, bs, R, a.Sp) - base
         if d > bestD then
           bestD = d
           best = cand
@@ -208,6 +302,15 @@ do
       local id = U.At(sl, j).id
       if Sh.SelfVisible(id) and not F().SelfMaxed(id, db.self[id]) then
         U.Insert(out, { kind = "self", id = id, slot = j, amount = 1, cost = F().SelfCost(id, db.self[id]) })
+      end
+    end
+    if Sh.SpellsOpen() then
+      local al = Mrgl.Data.Abilities
+      for a = 1, U.Len(al) do
+        local aid = U.At(al, a).id
+        if Mrgl.Core.Abilities.Unlocked(aid) then
+          U.Insert(out, { kind = "spell", id = aid, slot = a, amount = 1, cost = F().SpellCost(aid, db.spells[aid]) })
+        end
       end
     end
     return out
@@ -347,6 +450,9 @@ do
     if t.kind == "upgrade" then
       return U.At(F().Murloc(t.slot).upgrades, t.tier).name
     end
+    if t.kind == "spell" then
+      return Mrgl.Core.Abilities.Look(t.id).name
+    end
     return U.At(Mrgl.Data.Self, t.slot).name
   end
   function calcChain()
@@ -361,7 +467,7 @@ do
       return ch
     end
     local c = Sh.ClickFactor()
-    local base = F().EffDPS(real.murlocs, real.self, c)
+    local base = F().EffDPS(real.murlocs, real.self, c, real.spells)
     local copy = Mrgl.Core.State.Copy(real)
     local wasSilent = rt.silent
     rt.silent = true
@@ -386,7 +492,7 @@ do
       end
       t = Sh.BestBuy()
     end
-    local after = F().EffDPS(copy.murlocs, copy.self, c)
+    local after = F().EffDPS(copy.murlocs, copy.self, c, copy.spells)
     Mrgl.db = real
     rt.silent = wasSilent
     ch.n = n
@@ -435,23 +541,52 @@ do
     if t.kind == "upgrade" then
       return Sh.BuyUpgrade(t.id)
     end
+    if t.kind == "spell" then
+      return Sh.BuySpell(t.id)
+    end
     return Sh.BuySelf(t.id)
+  end
+  Sh.TopUp = function(i)
+    local e = Mrgl.db.murlocs[F().Murloc(i).id]
+    if e.u < 3 or e.u >= F().UpgradeMax(i) then
+      return 0
+    end
+    return math.max(0, F().UpgradeReq(i, e.u + 1) - e.n)
   end
   local function buyCheap()
     local db = Mrgl.db
     local n = 0
-    for guard = 1, 18 do
-      local bi, bc = 0, 0
+    for guard = 1, 30 do
+      local bi, bc, bk = 0, 0, 0
       for i = 1, Sh.Count() do
+        local c, k
         if Sh.UpgradeUnlocked(i) then
-          local c = F().UpgradeCost(i, db.murlocs[F().Murloc(i).id].u + 1)
+          c = F().UpgradeCost(i, db.murlocs[F().Murloc(i).id].u + 1)
           if c <= B().TIDE_CHEAP_UPG * db.gold and (bi == 0 or c < bc) then
             bi = i
             bc = c
+            bk = 0
+          end
+        else
+          k = Sh.TopUp(i)
+          if k > 0 then
+            c = Sh.Price(i, k)
+            if c <= B().TIDE_CHEAP_UPG * db.gold and (bi == 0 or c < bc) then
+              bi = i
+              bc = c
+              bk = k
+            end
           end
         end
       end
-      if bi == 0 or not Sh.BuyUpgrade(F().Murloc(bi).id) then
+      if bi == 0 then
+        break
+      end
+      if bk > 0 then
+        if not Sh.Hire(F().Murloc(bi).id, bk) then
+          break
+        end
+      elseif not Sh.BuyUpgrade(F().Murloc(bi).id) then
         break
       end
       n = n + 1

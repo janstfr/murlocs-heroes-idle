@@ -13,17 +13,21 @@ Mrgl.Data.Self = {
 Mrgl.Data.Abilities = {
   { id = "mrgl", name = "MRGLGLGL!", icon = "Ability_Warrior_BattleShout", stage = 3, cd = 30, dur = 0,
     text = "Instantly deals one click plus 5 seconds of squad damage.",
+    grow = "Ranks raise the seconds of squad damage.",
     key = "1",
     alt = { name = "Anyfin Can Happen", icon = "Spell_Holy_Resurrection",
            text = "Instantly deals one click plus 30 seconds of squad damage." } },
   { id = "whelps", name = "Many Whelps!", icon = "INV_Misc_Head_Dragon_Black", stage = 10, cd = 120, dur = 10,
     text = "10 automatic clicks per second for 10 seconds.",
+    grow = "Ranks raise the damage of the whelps.",
     key = "2" },
   { id = "candle", name = "You no take candle!", icon = "INV_Misc_Candle_01", stage = 20, cd = 180, dur = 15,
     text = "+50% crit chance for 15 seconds.",
+    grow = "Ranks make it last longer.",
     key = "3" },
   { id = "leeroy", name = "LEEROY!", icon = "Ability_Warrior_Charge", stage = 30, cd = 300, dur = 10,
     text = "Charges in: 5 critical clicks plus 20 seconds of squad damage, then every click crits for 10 seconds. A kill pays triple gold.",
+    grow = "Ranks raise the critical clicks and the seconds of squad damage.",
     key = "4" }
 }
 Mrgl.Data.OpenerOrder = {"candle", "whelps", "leeroy", "mrgl"}

@@ -178,9 +178,10 @@ do
   end
   local TIDE_KEEP_Y, TIDE_RESET_Y, TIDE_FOREVER_Y = -200, -222, -248
   local TIDE_PICK_X, TIDE_PICK = { -76, 0, 76 }, 48
-  local TIDE_KEEP = { { "", "TIDE_KEEP_POINTS" }, { "Ability_Warrior_BattleShout", "TIDE_KEEP_ABIL" }, { "INV_Misc_Gear_01", "TIDE_KEEP_SET" } }
+  local TIDE_KEEP = { { "", "TIDE_KEEP_POINTS" }, { "INV_Misc_Key_03", "TIDE_KEEP_ABIL" }, { "INV_Misc_Gear_01", "TIDE_KEEP_SET" } }
   local TIDE_RESET = { { "INV_Misc_Coin_01", "TIDE_RESET_GOLD" }, { "INV_Misc_Head_Murloc_01", "TIDE_RESET_SQUAD" },
-    { "INV_Gauntlets_04", "TIDE_RESET_SELF" }, { "INV_Misc_Bone_HumanSkull_01", "TIDE_RESET_STAGE" } }
+    { "INV_Gauntlets_04", "TIDE_RESET_SELF" }, { "Ability_Warrior_BattleShout", "TIDE_RESET_SPELLS" },
+    { "INV_Misc_Bone_HumanSkull_01", "TIDE_RESET_STAGE" } }
   function tideSmall(p, list, a)
     local S = Mrgl.Data.Strings
     local out = {}
@@ -460,11 +461,7 @@ do
     local p = U.At(D.paths, pi)
     local old = pr.paths[p.id]
     if none then
-      local luck = S.TIDE_LUCK_LINE
-      if pr.mark <= Mrgl.Data.Balance.TIDE_STAGE + Mrgl.Data.Balance.TIDE_STEP then
-        luck = S.TIDE_LUCK_ONE
-      end
-      tp.rank:SetText(U.Fill(luck, { c = math.floor(Core().Tide.Chance() * 100 + 0.5), m = pr.mark }))
+      tp.rank:SetText(Tips().TideLuck())
       tp.ms:SetText("")
     else
       tp.rank:SetText(U.Fill(S.TIDE_POP_RANK, { path = p.name, old = old, ["new"] = old + n }))
@@ -485,6 +482,12 @@ do
     tp.gold:SetShown(not none)
     K().SetIcon(tp.go.icon, p.icon)
     tp.go.icon:SetShown(not none)
+    tp.go.text:ClearAllPoints()
+    if none then
+      tp.go.text:SetPoint("CENTER", tp.go, "CENTER", 0, 0)
+    else
+      tp.go.text:SetPoint("CENTER", tp.go, "CENTER", 8, 0)
+    end
     local inC = Core().rt.inCombat == true
     tp.inC = inC
     if inC then

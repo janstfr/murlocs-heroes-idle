@@ -417,6 +417,10 @@ do
       db.self[U.At(sl, j).id] = 0
     end
     db.buffs.whelps = 0; db.buffs.candle = 0; db.buffs.leeroy = 0
+    local al = Mrgl.Data.Abilities
+    for k = 1, U.Len(al) do
+      db.spells[U.At(al, k).id] = 0
+    end
     db.autoFailDps = {}
     rt.gateFired = false
     rt.respawn = 0

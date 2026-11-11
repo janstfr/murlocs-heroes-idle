@@ -3,6 +3,8 @@ Mrgl.UI = Mrgl.UI or {}
 do
   local K, C, Core, F, Tips, Po, backdrop, lockBorder, glowBorder, setGlow, buildStat, buildRow, buildUpgradeParts, retry, setSettings, hireAmount, selfLocked, upgState, anyAffordable, bestMark, isBest, resetRow, setCost, fillSquad, fillSelf, fillUpgrade, bestLine
   local Ti, tideNew, anyNew, tideDot, tideLeave, tideBox, tideNewEdge, lockLook, buildTide, buildTidePath, tideReason, fillTide, fillTidePath
+  local tabPos, spellLocked, fillSpell
+  local modeTab, rankAmount
   local P = {}
   Mrgl.UI.Panel = P
   local U = Mrgl.U
@@ -30,8 +32,10 @@ do
   P.tw = tw
   local side = "right"
   local ROWS = 6
-  local TABS = 4
+  local TABS = 5
+  local TAB_ORDER = { 1, 2, 3, 5, 4 }
   local LOCK_A = 0.25
+  local UPG_PIPS = 6
   local settingsOpen = false
   local needReanchor = false
   local retryPending = false
@@ -88,27 +92,33 @@ do
     w.openMove1 = K().AddMove(w.openAnim, -8, 0, 0, 0, 1)
     w.openMove2 = K().AddMove(w.openAnim, 8, 0, 0.15, 0, 2, "OUT")
     K().AddAlpha(w.openAnim, 0, 1, 0.15, 0, 2, "OUT")
-    local tabIcons = { Mrgl.Data.Icons.tabSquad, Mrgl.Data.Icons.tabUpgrades, Mrgl.Data.Icons.tabSelf, Mrgl.Data.Tide.icon }
+    local tabIcons = { Mrgl.Data.Icons.tabSquad, Mrgl.Data.Icons.tabUpgrades, Mrgl.Data.Icons.tabSelf, Mrgl.Data.Tide.icon,
+      Mrgl.Data.Icons.tabSpells }
     local tabTips = { { S.TAB_SQUAD, S.TAB_SQUAD_TIP }, { S.TAB_UPGRADES, S.TAB_UPGRADES_TIP }, { S.TAB_SELF, S.TAB_SELF_TIP }, { S.TAB_TIDE, S.TAB_TIDE_TIP } }
     w.tabs = {  }
     for i = 1, TABS do
       local t = K().IconButton(f, "MrglSquadTab" .. i, 24, U.At(tabIcons, i))
-      t:SetPoint("TOPLEFT", f, "TOPLEFT", 8 + (i - 1) * 28, -4)
+      t:SetPoint("TOPLEFT", f, "TOPLEFT", 8 + (tabPos(i) - 1) * 28, -4)
       t.border = K().Border(t, C().gold, "OVERLAY")
       t.dot = t:CreateTexture(nil, "OVERLAY", nil, 2)
       t.dot:SetSize(6, 6)
       t.dot:SetPoint("TOPRIGHT", t, "TOPRIGHT", 2, 2)
       K().SetColor(t.dot, C().good)
       t.index = i
-      local tip = U.At(tabTips, i)
-      K().Tip(t, Tips().Simple(U.At(tip, 1), U.At(tip, 2)))
+      if i == 5 then
+        K().Tip(t, function(tt)
+          Tips().SpellsTab(tt)
+        end)
+      else
+        local tip = U.At(tabTips, i)
+        K().Tip(t, Tips().Simple(U.At(tip, 1), U.At(tip, 2)))
+      end
       t:SetScript("OnClick", function(self)
         P.SetTab(self.index)
       end)
       U.Insert(w.tabs, t)
     end
     local modeText = { S.MODE_X1, S.MODE_NEXT, S.MODE_MAX }
-    local modeTips = { S.MODE_X1_TIP, S.MODE_NEXT_TIP, S.MODE_MAX_TIP }
     w.modes = {  }
     for m = 1, 3 do
       local b = CreateFrame("Button", "MrglSquadMode" .. m, f)
@@ -125,7 +135,9 @@ do
       b.line:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -6, 0)
       K().SetColor(b.line, C().gold)
       b.index = m
-      K().Tip(b, Tips().Simple(U.At(modeText, m), U.At(modeTips, m)))
+      K().Tip(b, function(tt, self)
+        P.ModeTip(tt, self.index)
+      end)
       b:SetScript("OnClick", function(self)
         Mrgl.db.settings.mode = self.index
         Core().Shop.Dirty()
@@ -256,19 +268,23 @@ do
     b.uName:SetWidth(140)
     b.uName:SetPoint("LEFT", b, "LEFT", 40, 6)
     b.pips = {  }
-    for p = 1, 3 do
+    for p = 1, UPG_PIPS do
       local pip = CreateFrame("Frame", nil, b.upg)
       pip:SetSize(6, 6)
-      pip:SetPoint("LEFT", b, "LEFT", 40 + (p - 1) * 9, -8)
+      local gx = 0
+      if p > 3 then
+        gx = 3
+      end
+      pip:SetPoint("LEFT", b, "LEFT", 40 + (p - 1) * 9 + gx, -8)
       pip.fill = K().Fill(pip, C().muted, "ARTWORK")
       pip.ring = K().Border(pip, C().line, "ARTWORK")
       U.Insert(b.pips, pip)
     end
     b.uFx = K().Text(b.upg, K().ARIALN, 11, C().good, "")
-    b.uFx:SetWidth(110)
-    b.uFx:SetPoint("LEFT", b, "LEFT", 70, -8)
+    b.uFx:SetWidth(120)
+    b.uFx:SetPoint("LEFT", b, "LEFT", 103, -8)
     b.cond = K().Text(b.upg, K().ARIALN, 11, C().muted, "")
-    b.cond:SetPoint("RIGHT", b, "RIGHT", -4, 0)
+    b.cond:SetPoint("RIGHT", b, "RIGHT", -4, 6)
     b.cond:SetJustifyH("RIGHT")
     b.upg:Hide()
   end
@@ -350,6 +366,9 @@ do
     P.Show(not w.frame:IsShown())
   end
   P.SetTab = function(i)
+    if i == 5 and not Core().Shop.SpellsOpen() then
+      return
+    end
     if i ~= 4 then
       tideLeave()
     end
@@ -357,8 +376,21 @@ do
     setSettings(false)
     P.Refresh()
   end
+  function tabPos(i)
+    for k = 1, TABS do
+      if U.At(TAB_ORDER, k) == i then
+        return k
+      end
+    end
+    return 1
+  end
   P.NextTab = function()
-    P.SetTab(Mrgl.db.settings.tab % TABS + 1)
+    local k = tabPos(Mrgl.db.settings.tab) % TABS + 1
+    local nx = U.At(TAB_ORDER, k)
+    if nx == 5 and not Core().Shop.SpellsOpen() then
+      nx = U.At(TAB_ORDER, k % TABS + 1)
+    end
+    P.SetTab(nx)
   end
   function setSettings(on)
     if on then
@@ -404,18 +436,38 @@ do
   function hireAmount(i)
     return Core().Shop.Amount(i, Mrgl.db.settings.mode)
   end
+  function modeTab(tab)
+    return tab == 1 or tab == 3 or tab == 5
+  end
+  P.ModeTab = modeTab
+  function rankAmount(kind, id)
+    return Core().Shop.RankAmount(kind, id, Mrgl.db.settings.mode)
+  end
+  P.RankAmount = rankAmount
+  P.ModeTip = function(tt, m)
+    local S = Mrgl.Data.Strings
+    local tips = { S.MODE_X1_TIP, S.MODE_NEXT_TIP, S.MODE_MAX_TIP }
+    local text = U.At(tips, m)
+    if m == 2 and Mrgl.db.settings.tab ~= 1 then
+      text = S.MODE_NEXT_RANK_TIP
+    end
+    Tips().Simple(U.At({ S.MODE_X1, S.MODE_NEXT, S.MODE_MAX }, m), text)(tt)
+  end
   function selfLocked(id)
     return not Core().Shop.SelfVisible(id)
   end
+  function spellLocked(id)
+    return not Core().Shop.SpellVisible(id)
+  end
   function upgState(i)
     local e = Mrgl.db.murlocs[F().Murloc(i).id]
-    if e.u >= 3 then
+    if e.u >= F().UpgradeMax(i) then
       return "done"
     end
     if e.n <= 0 then
       return "nohire"
     end
-    if e.n < F().UpgradeReq(e.u + 1) then
+    if e.n < F().UpgradeReq(i, e.u + 1) then
       return "locked"
     end
     return "buy"
@@ -446,7 +498,7 @@ do
           i = i + 1
         end
       end
-    else
+    elseif tab == 3 then
       local l = Mrgl.Data.Self
       do
         i = 1
@@ -456,6 +508,14 @@ do
             return true
           end
           i = i + 1
+        end
+      end
+    elseif tab == 5 then
+      local al = Mrgl.Data.Abilities
+      for k = 1, U.Len(al) do
+        local aid = U.At(al, k).id
+        if not spellLocked(aid) and F().SpellCost(aid, db.spells[aid]) <= db.gold then
+          return true
         end
       end
     end
@@ -501,6 +561,10 @@ do
       return
     end
     local db = Mrgl.db
+    local spellsOpen = Core().Shop.SpellsOpen()
+    if db.settings.tab == 5 and not spellsOpen then
+      db.settings.tab = 1
+    end
     local tab = db.settings.tab
     local mark = bestMark()
     for i = 1, TABS do
@@ -510,24 +574,30 @@ do
       t.icon:SetDesaturated(not active)
       if active then
         t:SetAlpha(1)
+      elseif i == 5 and not spellsOpen then
+        t:SetAlpha(0.35)
       else
         t:SetAlpha(0.6)
       end
       if i == 4 then
         t.dot:SetShown(tideDot())
+      elseif i == 5 and not spellsOpen then
+        t.dot:SetShown(false)
       else
         t.dot:SetShown(anyAffordable(i))
       end
     end
     local onTide = tab == 4 and not settingsOpen
     w.tide:SetShown(onTide)
+    local calmSwap = onTide and tw.onTide == true and Mrgl.UI.Main.NumAnimate()
+    tw.onTide = onTide
     if onTide then
       tw.seen = true
-      fillTide()
+      fillTide(calmSwap)
     end
     for m = 1, 3 do
       local b = U.At(w.modes, m)
-      b:SetShown(tab == 1 and not settingsOpen)
+      b:SetShown(modeTab(tab) and not settingsOpen)
       local on = db.settings.mode == m
       if on then
         K().SetTextColor(b.text, C().gold)
@@ -538,7 +608,7 @@ do
     end
     for r = 1, ROWS do
       local row = U.At(w.rows, r)
-      if settingsOpen or onTide or tab == 3 and r > U.Len(Mrgl.Data.Self) then
+      if settingsOpen or onTide or tab == 3 and r > U.Len(Mrgl.Data.Self) or tab == 5 and r > U.Len(Mrgl.Data.Abilities) then
         row:Hide()
         setGlow(row.glowFrame, false)
       else
@@ -547,6 +617,8 @@ do
           fillSquad(row, r, mark)
         elseif tab == 2 then
           fillUpgrade(row, r, mark)
+        elseif tab == 5 then
+          fillSpell(row, r, mark)
         else
           fillSelf(row, r, mark)
         end
@@ -560,6 +632,7 @@ do
   end
   function resetRow(b)
     b.sub:SetText("")
+    K().SetTextColor(b.sub, C().muted)
     b.count:SetText("")
     b.amount:SetText("")
     b.barBg:Hide()
@@ -647,13 +720,64 @@ do
       K().SetTextColor(b.cost, C().gold)
       b.coin:Hide()
     else
-      setCost(b.cost, F().SelfCost(d.id, r))
+      local k = rankAmount("self", d.id)
+      local cost = Core().Shop.RankPrice("self", d.id, k)
+      if db.settings.mode ~= 1 then
+        b.amount:SetText("+" .. k)
+      end
+      setCost(b.cost, cost)
       local gain = Tips().SelfGain(d.id)
-      if gain >= 0 and U.GainLow(gain) and F().SelfCost(d.id, r) <= db.gold then
+      if gain >= 0 and U.GainLow(gain) and cost <= db.gold then
         K().SetTextColor(b.cost, C().muted)
       end
     end
     setGlow(b.glowFrame, isBest(mark, "self", j))
+  end
+  function fillSpell(b, j, mark)
+    local db = Mrgl.db
+    local S = Mrgl.Data.Strings
+    local d = U.At(Mrgl.Data.Abilities, j)
+    local look = Core().Abilities.Look(d.id)
+    local r = db.spells[d.id]
+    resetRow(b)
+    b.headF:Hide()
+    b.icon:Show()
+    K().SetIcon(b.icon, look.icon)
+    b.name:SetText(look.name)
+    b.count:SetText(U.Str(r))
+    b.sub:SetText(Tips().SpellValueText(d.id, r))
+    if r <= 0 then
+      b.sub:SetText(U.Fill(S.SPELL_PER_RANK, { p = math.floor(100 * Mrgl.Data.Balance.SPELL_RANK_STEP + 0.5) }))
+      if not spellLocked(d.id) then
+        K().SetTextColor(b.sub, C().good)
+      end
+    end
+    if spellLocked(d.id) then
+      b.icon:SetDesaturated(true)
+      b.ic:SetAlpha(0.4)
+      b.lock:SetShown(true)
+      K().SetTextColor(b.name, C().muted)
+      K().SetTextColor(b.count, C().muted)
+      b.coin:Hide()
+      b.cost:SetText(U.Fill(S.SELF_LOCK_STAGE, { s = d.stage }))
+      K().SetTextColor(b.cost, C().muted)
+      setGlow(b.glowFrame, false)
+      return
+    end
+    b.icon:SetDesaturated(false)
+    K().SetTextColor(b.name, C().text)
+    K().SetTextColor(b.count, C().white)
+    local k = rankAmount("spell", d.id)
+    local cost = Core().Shop.RankPrice("spell", d.id, k)
+    if db.settings.mode ~= 1 then
+      b.amount:SetText("+" .. k)
+    end
+    setCost(b.cost, cost)
+    local gain = Tips().SpellGain(d.id)
+    if U.GainLow(gain) and cost <= db.gold then
+      K().SetTextColor(b.cost, C().muted)
+    end
+    setGlow(b.glowFrame, isBest(mark, "spell", j))
   end
   function fillUpgrade(b, i, mark)
     local S = Mrgl.Data.Strings
@@ -669,7 +793,7 @@ do
     b.coin:Hide()
     b.cost:SetText("")
     b.cond:SetText("")
-    for p = 1, 3 do
+    for p = 1, UPG_PIPS do
       local pip = U.At(b.pips, p)
       pip.fill:SetShown(p <= e.u)
       pip.ring:SetShown(p > e.u)
@@ -701,7 +825,7 @@ do
       K().SetTextColor(b.uName, C().text)
       K().SetTextColor(b.uFx, C().good)
       b.coin:Show()
-      setCost(b.cost, up.cost)
+      setCost(b.cost, F().UpgradeCost(i, t))
     else
       K().SetTextColor(b.uName, C().muted)
       K().SetTextColor(b.uFx, C().muted)
@@ -709,7 +833,7 @@ do
         b.cond:SetText(S.UPG_HIRE_FIRST)
         b:SetAlpha(0.35)
       else
-        b.cond:SetText(U.Fill(S.UPG_REQ, { n = e.n, req = F().UpgradeReq(t) }))
+        b.cond:SetText(U.Fill(S.UPG_REQ, { n = e.n, req = F().UpgradeReq(i, t) }))
       end
     end
     setGlow(b.glowFrame, st == "buy" and isBest(mark, "upgrade", i, t))
@@ -816,9 +940,20 @@ do
     K().Tip(tw.icon, function(tt)
       Tips().TideHead(tt)
     end)
-    tw.wave = K().Text(tw.icon, K().ARIALN, 10, C().white, "OUTLINE", "OVERLAY")
-    tw.wave:SetPoint("BOTTOMRIGHT", tw.icon, "BOTTOMRIGHT", -1, 2)
+    tw.cnt = CreateFrame("Frame", "MrglSquadTideCount", tw.icon)
+    tw.cnt:SetSize(8, 12)
+    tw.cnt:SetPoint("BOTTOMRIGHT", tw.icon, "BOTTOMRIGHT", -1, 1)
+    tw.cnt:SetFrameLevel(tw.icon:GetFrameLevel() + 2)
+    tw.plate = tw.cnt:CreateTexture(nil, "BACKGROUND")
+    tw.plate:SetAllPoints(tw.cnt)
+    tw.plate:SetColorTexture(0, 0, 0, 0.6)
+    tw.wave = K().Text(tw.cnt, K().ARIALN, 12, C().white, "OUTLINE", "OVERLAY")
+    tw.wave:SetPoint("RIGHT", tw.cnt, "RIGHT", -1, 0)
     tw.wave:SetJustifyH("RIGHT")
+    Mrgl.UI.Main.NumBox(tw.cnt, tw.wave, function(fr)
+      fr:SetWidth(math.ceil(fr.fs:GetStringWidth()) + 2)
+    end)
+    tw.cnt:Hide()
     tw.best = CreateFrame("Button", "MrglSquadTideBest", pg)
     tw.best:SetSize(84, 16)
     tw.best:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -36)
@@ -965,7 +1100,7 @@ do
     return { text = U.Fill(S.TIDE_NEXT_PT, { m = Ti().NextPoint() }), c = C().muted }
   end
   P.TideReason = tideReason
-  function fillTide()
+  function fillTide(calmSwap)
     local db = Mrgl.db
     local S = Mrgl.Data.Strings
     local T = Ti()
@@ -987,9 +1122,12 @@ do
     end
     lockLook(tw.quarter, total >= 1, db.settings[U.At(Mrgl.Data.Tide.first, 1).toggle] ~= false, nw.first == true)
     lockLook(tw.nef, T.Trophy("nef"), true, nw.nef == true)
-    local pts = T.Waiting()
-    tw.wave:SetText("" .. pts)
-    tw.wave:SetShown(pts >= 1)
+    local pts = Mrgl.UI.Main.WaitingShown()
+    local owned = total + pts
+    tw.cnt:SetShown(owned >= 1)
+    if owned >= 1 then
+      Mrgl.UI.Main.NumSet(tw.cnt, U.Str(owned), calmSwap == true)
+    end
     local b = tw.btn
     if T.Ready() and pts >= 1 then
       b.text:SetText(U.Fill(S.TIDE_BUTTON, { n = pts }))
@@ -998,8 +1136,8 @@ do
       b:SetAlpha(1)
     elseif T.Ready() then
       b.text:SetText(S.TIDE_BUTTON_LOCKED)
-      K().SetTextColor(b.text, C().gold)
-      b.edge:SetColor(C().gold)
+      K().SetTextColor(b.text, C().text)
+      b.edge:SetColor(C().line)
       b:SetAlpha(1)
     else
       b.text:SetText(S.TIDE_BUTTON_LOCKED)
@@ -1119,7 +1257,13 @@ do
       if d == nil or selfLocked(d.id) then
         return
       end
-      Sh.BuySelf(d.id)
+      Sh.BuySelf(d.id, rankAmount("self", d.id))
+    elseif tab == 5 then
+      local ad = U.At(Mrgl.Data.Abilities, r)
+      if ad == nil or spellLocked(ad.id) then
+        return
+      end
+      Sh.BuySpell(ad.id, rankAmount("spell", ad.id))
     end
     Mrgl.UI.Main.Refresh()
   end
@@ -1157,6 +1301,12 @@ do
       end
       Tips().Self(tt, r)
       bestLine(tt, "self", r)
+    elseif tab == 5 then
+      if U.At(Mrgl.Data.Abilities, r) == nil then
+        return
+      end
+      Tips().Spell(tt, r)
+      bestLine(tt, "spell", r)
     end
   end
   P.FlashMurloc = function(slot)

@@ -76,6 +76,12 @@ do
   Cb.SquadDPS = function()
     return F().SquadDPS(Mrgl.db.murlocs)
   end
+  Cb.BossDmg = function()
+    if not Mrgl.db.boss.active then
+      return 1
+    end
+    return F().BossDmg(Mrgl.db.murlocs)
+  end
   Cb.ClickDamage = function()
     return F().ClickDamage(Mrgl.db.murlocs, Mrgl.db.self, Cb.SquadDPS())
   end
@@ -202,7 +208,7 @@ do
         end
       else
         if dmg == nil then
-          dmg = math.min(B().HP_CAP, Cb.ClickDamage() * Mrgl.Core.Tide.SpellMult())
+          dmg = math.min(B().HP_CAP, Cb.ClickDamage() * F().WhelpMult(db.murlocs) * Cb.BossDmg())
           cc = Cb.CritChance("whelp")
           cm = F().CritMult(db.self)
         end
@@ -247,7 +253,7 @@ do
       if rt.killSet == true then
         return
       end
-      local dmg = math.min(B().HP_CAP, Cb.ClickDamage() * Mrgl.Core.Tide.SpellMult())
+      local dmg = math.min(B().HP_CAP, Cb.ClickDamage() * F().WhelpMult(db.murlocs) * Cb.BossDmg())
       local cc = Cb.CritChance("whelp")
       local cm = F().CritMult(db.self)
       local avg = dmg * (1 + cc * (cm - 1))
@@ -337,6 +343,7 @@ do
     if rt.respawn > 0 then
       return false
     end
+    amount = amount * Cb.BossDmg()
     if amount > B().HP_CAP then
       amount = B().HP_CAP
     end
@@ -375,7 +382,7 @@ do
   Cb.Squad = function(dt)
     local db = Mrgl.db
     local rt = C.rt
-    local d = Cb.SquadDPS()
+    local d = Cb.SquadDPS() * Cb.BossDmg()
     local ml = B().MIN_LIFE
     local t = dt
     local guard = 0
