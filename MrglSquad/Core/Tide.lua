@@ -47,12 +47,11 @@ do
     return T.Points(p) >= T.Ms(i)
   end
   T.Reached = function()
-    local db = Mrgl.db
-    local gate = 0
-    if Cb().GateOpen() then
-      gate = db.stage + 1
+    local m = Mrgl.db.maxStage
+    if F().IsBoss(m) then
+      return m - 1
     end
-    return math.max(db.maxStage, gate)
+    return m
   end
   local function pr()
     return Mrgl.db.prestige
@@ -72,7 +71,7 @@ do
     return math.min(1, b.TIDE_CHANCE + b.TIDE_LUCK * pr().dry)
   end
   T.Best = function()
-    return math.max(pr().best, T.Reached())
+    return math.max(pr().best, Mrgl.db.maxStage)
   end
   T.CanEmpty = function()
     return pr().mark >= B().TIDE_STAGE + B().TIDE_STEP
